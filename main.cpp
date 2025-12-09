@@ -4,6 +4,7 @@
 #include "Vertex.hpp"
 #include "Shader.hpp"
 #include "Model.hpp"
+#include <glm/gtc/matrix_transform.hpp>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
@@ -74,6 +75,21 @@ int main()
 			}
 		}
 
+		std::vector<std::vector<InstanceData>> instanceGroups(models.size());
+		// Example: create 3 instances for each model with different transforms
+		for(size_t i = 0; i < models.size(); ++i)
+		{
+			for(int j = 0; j <= 3; ++j)
+			{
+				InstanceData inst{};
+				glm::mat4 model = glm::mat4(1.0f);
+				model = glm::translate(model, glm::vec3(j * 0.7f, i * 0.3f, 0.0f));
+				model = glm::scale(model, glm::vec3(0.5f));
+				inst.model = model;
+				instanceGroups[i].push_back(inst);
+			}
+		}
+
 		while(!glfwWindowShouldClose(window))
 		{
 			processInput(window);
@@ -83,8 +99,8 @@ int main()
 
 			shader.use(0);
 
-			for(auto& model : models)
-				model.draw();
+			for(size_t i = 0; i < models.size(); ++i)
+				models[i].drawInstanced(instanceGroups[i]);
 
 			glfwSwapBuffers(window);
 			glfwPollEvents();
