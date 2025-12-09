@@ -4,17 +4,19 @@ project(OpenGLTriangle)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(triangle main.cpp)
+set(PNAME "LearnOpenGL")
+
+add_executable(${PNAME} main.cpp)
 
 file(GLOB_RECURSE PROJECT_SOURCES ${CMAKE_SOURCE_DIR}/source/*.cpp)
-target_sources(triangle PRIVATE ${PROJECT_SOURCES})
+target_sources(${PNAME} PRIVATE ${PROJECT_SOURCES})
 
 find_package(OpenGL REQUIRED)
 
 add_library(glad STATIC vendored/glad/src/glad.c)
 target_include_directories(glad PUBLIC vendored/glad/include)
 
-target_include_directories(triangle
+target_include_directories(${PNAME}
         PUBLIC
             vendored/glfw-3.4/include
             vendored/glm
@@ -22,7 +24,7 @@ target_include_directories(triangle
             ${CMAKE_SOURCE_DIR}/source
 )
 
-target_link_libraries(triangle
+target_link_libraries(${PNAME}
         OpenGL::GL
         glad
         ${CMAKE_DL_LIBS}

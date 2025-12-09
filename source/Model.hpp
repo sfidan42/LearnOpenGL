@@ -1,6 +1,7 @@
 #pragma once
 #include "Texture.hpp"
 #include "Vertex.hpp"
+#include "Instance.hpp"
 
 class Model
 {
@@ -15,6 +16,7 @@ public:
 	void draw();
 
 private:
+	std::vector<Instance> instances;
 	std::vector<Vertex> vertices;
 	Texture texture{};
 	GLuint VAO;

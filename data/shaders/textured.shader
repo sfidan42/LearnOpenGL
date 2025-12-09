@@ -7,19 +7,19 @@ out vec2 TexCoord;
 
 void main()
 {
-   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
-   TexCoord = aTexCoord;
+    gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
+    TexCoord = aTexCoord;
 }
 
 #shader fragment
 #version 330 core
 
 in vec2 TexCoord;
-uniform sampler2D texture1;
+uniform sampler2D texSampler;
 
 out vec4 FragColor;
 
 void main()
 {
-   FragColor = texture(texture1, TexCoord);
+    FragColor = texture(texSampler, TexCoord);
 }

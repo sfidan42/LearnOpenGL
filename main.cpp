@@ -55,13 +55,24 @@ int main()
 		}
 
 		if(!models[0].loadTexture("textures/container.jpg"))
+		{
 			std::cout << "Failed to load texture for model 0" << std::endl;
+			return -1;
+		}
 		if(!models[1].loadTexture("textures/awesomeface.png"))
+		{
 			std::cout << "Failed to load texture for model 1" << std::endl;
+			return -1;
+		}
 
 		for(auto& model : models)
+		{
 			if(!model.bind())
+			{
 				std::cout << "Failed to bind model" << std::endl;
+				return -1;
+			}
+		}
 
 		while(!glfwWindowShouldClose(window))
 		{

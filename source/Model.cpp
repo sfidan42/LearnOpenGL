@@ -15,8 +15,6 @@ Model::~Model()
 
 bool Model::loadGeometry()
 {
-	static float offset;
-
 	std::vector<glm::vec3> positions = {
 		{-0.5f, -0.5f, 0.0f}, // bottom left
 		{0.5f, -0.5f, 0.0f}, // bottom right
@@ -38,10 +36,9 @@ bool Model::loadGeometry()
 	vertices.resize(n);
 	for(uint32_t i = 0; i < n; i++)
 	{
-		vertices[i].position = positions[i] + glm::vec3(offset, 0.0f, 0.0f);
+		vertices[i].position = positions[i];
 		vertices[i].texCoord = texCoords[i];
 	}
-	offset += 1.0f;
 	return true;
 }
 
