@@ -1,9 +1,9 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
-
 #include "Vertex.hpp"
 #include "Shader.hpp"
+#include "Model.hpp"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
@@ -33,47 +33,52 @@ int main()
 	glViewport(0, 0, 800, 600);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-	std::vector<std::string> shader_filepaths;
-	shader_filepaths.emplace_back("shaders/simple.shader");
-
-	Shader shader;
-	shader.load_shaders(shader_filepaths);
-
-	std::vector<Vertex> vertices = {
-		{{-0.5f, -0.5f, 0.0f}}, // left
-		{{0.5f, -0.5f, 0.0f}}, // right
-		{{0.0f, 0.5f, 0.0f}} // top
-	};
-
-	unsigned int VBO, VAO;
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
-
-	Vertex::bindAttributes();
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
-
-	while(!glfwWindowShouldClose(window))
 	{
-		processInput(window);
+		std::vector<std::string> shader_filepaths;
+		shader_filepaths.emplace_back("shaders/textured.shader");
+		Shader shader;
+		if(!shader.load_shaders(shader_filepaths))
+		{
+			std::cout << "Failed to load shaders" << std::endl;
+			return -1;
+		}
 
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+		std::vector<Model> models(2);
 
-		shader.use(0);
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		for(auto& model : models)
+		{
+			if(!model.loadGeometry())
+			{
+				std::cout << "Failed to load geometry" << std::endl;
+				return -1;
+			}
+		}
 
-		glfwSwapBuffers(window);
-		glfwPollEvents();
-	}
+		if(!models[0].loadTexture("textures/container.jpg"))
+			std::cout << "Failed to load texture for model 0" << std::endl;
+		if(!models[1].loadTexture("textures/awesomeface.png"))
+			std::cout << "Failed to load texture for model 1" << std::endl;
 
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
+		for(auto& model : models)
+			if(!model.bind())
+				std::cout << "Failed to bind model" << std::endl;
+
+		while(!glfwWindowShouldClose(window))
+		{
+			processInput(window);
+
+			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
+
+			shader.use(0);
+
+			for(auto& model : models)
+				model.draw();
+
+			glfwSwapBuffers(window);
+			glfwPollEvents();
+		}
+	} // OpenGL objects destroyed here, before context termination
 
 	glfwTerminate();
 	return 0;

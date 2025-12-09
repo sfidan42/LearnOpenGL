@@ -18,6 +18,7 @@ target_include_directories(triangle
         PUBLIC
             vendored/glfw-3.4/include
             vendored/glm
+            vendored/stb
             ${CMAKE_SOURCE_DIR}/source
 )
 

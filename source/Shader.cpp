@@ -1,11 +1,11 @@
 #include "Shader.hpp"
 
-void Shader::load_shaders(const std::vector<std::string>& filepaths)
+bool Shader::load_shaders(const std::vector<std::string>& filepaths)
 {
 	config(filepaths.size());
 	for (const std::string& filepath : filepaths)
 		read(filepath);
-	create();
+	return create();
 }
 
 void Shader::config(const unsigned int count)
@@ -49,7 +49,7 @@ void Shader::read(const std::string& filepath)
 	shaders.push_back({ss[0].str(), ss[1].str()});
 }
 
-static void compile(GLuint shader, const char* shader_source)
+static bool compile(GLuint shader, const char* shader_source)
 {
 	int success;
 	char infoLog[512];
@@ -62,10 +62,12 @@ static void compile(GLuint shader, const char* shader_source)
 		glGetShaderInfoLog(shader, 512, nullptr, infoLog);
 		std::cerr << "shader compilation failed\n" << infoLog << std::endl;
 		std::cerr << shader_source << std::endl;
+		return false;
 	}
+	return true;
 }
 
-void Shader::create()
+bool Shader::create()
 {
 	int success;
 	char infoLog[512];
@@ -78,8 +80,8 @@ void Shader::create()
 		unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 		unsigned int shaderProgram = glCreateProgram();
 
-		compile(vertexShader, vertexShaderSource);
-		compile(fragmentShader, fragmentShaderSource);
+		if(!compile(vertexShader, vertexShaderSource) || !compile(fragmentShader, fragmentShaderSource))
+			return false;
 		glAttachShader(shaderProgram, vertexShader);
 		glAttachShader(shaderProgram, fragmentShader);
 		glLinkProgram(shaderProgram);
@@ -88,11 +90,13 @@ void Shader::create()
 		{
 			glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
 			std::cerr << "Shader program linking failed\n" << infoLog << std::endl;
+			return false;
 		}
 		glDeleteShader(vertexShader);
 		glDeleteShader(fragmentShader);
 		programs.push_back(shaderProgram);
 	}
+	return true;
 }
 
 void Shader::use(unsigned int index)
@@ -108,12 +112,19 @@ void Shader::use(unsigned int index)
 
 void Shader::setMat4fv(const std::string& name, const float* value) const
 {
-	const GLuint loc = glGetUniformLocation(program, name.c_str());
+	const GLint loc = glGetUniformLocation(program, name.c_str());
 	glUniformMatrix4fv(loc, 1, GL_FALSE, value);
 }
 
 void Shader::set3f(const std::string& name, float a, float b, float c) const
 {
-	const GLuint loc = glGetUniformLocation(program, name.c_str());
+	const GLint loc = glGetUniformLocation(program, name.c_str());
 	glUniform3f(loc, a, b, c);
+}
+
+Shader::~Shader()
+{
+	for (auto prog : programs) {
+		glDeleteProgram(prog);
+	}
 }
