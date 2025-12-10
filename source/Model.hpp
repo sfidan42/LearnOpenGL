@@ -26,7 +26,7 @@ struct InstanceData
 
 	void update(float deltaTime);
 
-private: // send to GPU only
+	// send to GPU only
 	glm::mat4 model;
 };
 

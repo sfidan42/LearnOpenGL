@@ -11,6 +11,7 @@
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 
 Camera camera;
 
@@ -40,6 +41,8 @@ int main()
 	glViewport(0, 0, 800, 600);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
+	glfwSetCursorPosCallback(window, mouse_callback);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	{
 		std::vector<std::string> shader_filepaths;
@@ -117,14 +120,17 @@ int main()
 			}
 		}
 
+		float lastTime = 0.0f;
+
 		while(!glfwWindowShouldClose(window))
 		{
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			shader.use(0);
-			static auto deltaTime = static_cast<float>(glfwGetTime());
-			deltaTime = static_cast<float>(glfwGetTime()) - deltaTime;
+			float currentTime = static_cast<float>(glfwGetTime());
+			float deltaTime = currentTime - lastTime;
+			lastTime = currentTime;
 
 			camera.update(deltaTime);
 
@@ -165,10 +171,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 					glfwSetWindowShouldClose(window, true);
 					break;
 				case GLFW_KEY_W:
-					camera.speed.z -= 1.0f;
+					camera.speed.z += 1.0f;
 					break;
 				case GLFW_KEY_S:
-					camera.speed.z += 1.0f;
+					camera.speed.z -= 1.0f;
 					break;
 				case GLFW_KEY_A:
 					camera.speed.x -= 1.0f;
@@ -184,10 +190,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			switch(key)
 			{
 				case GLFW_KEY_W:
-					camera.speed.z += 1.0f;
+					camera.speed.z -= 1.0f;
 					break;
 				case GLFW_KEY_S:
-					camera.speed.z -= 1.0f;
+					camera.speed.z += 1.0f;
 					break;
 				case GLFW_KEY_A:
 					camera.speed.x += 1.0f;
@@ -203,4 +209,26 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			std::cout << "undefined action" << std::endl;
 			break;
 	}
+}
+
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+	static float lastX = 400.0f;
+	static float lastY = 300.0f;
+	static bool firstMouse = true;
+
+	if (firstMouse)
+	{
+		lastX = static_cast<float>(xpos);
+		lastY = static_cast<float>(ypos);
+		firstMouse = false;
+	}
+
+	float xoffset = static_cast<float>(xpos) - lastX;
+	float yoffset = lastY - static_cast<float>(ypos); // reversed since y-coordinates go from bottom to top
+
+	lastX = static_cast<float>(xpos);
+	lastY = static_cast<float>(ypos);
+
+	camera.mouse(xoffset, yoffset);
 }
