@@ -1,7 +1,8 @@
 #include "Model.hpp"
-#include <glm/vec3.hpp>
 #include <glad/glad.h>
 #include <glm/ext/matrix_transform.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/euler_angles.hpp>
 
 Model::Model()
     : VAO(0), VBO(0), instanceVBO(0)
@@ -52,29 +53,36 @@ bool Model::loadTexture(const std::string& imagePath)
 	return texture.load(imagePath);
 }
 
+bool Model::instantiate(const InstanceData& data)
+{
+	if (glm::length(data.scale) <= 0.0f)
+		return false; // Invalid scale
+	instances.emplace_back(data);
+	instances.back().setup();
+	return true;
+}
+
 bool Model::bind() const
 {
-    glBindVertexArray(VAO);
+    GLuint idx = 0;
+
+	glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)), vertices.data(), GL_STATIC_DRAW);
-    Vertex::bindAttributes(); // <-- Bind attributes while VAO/VBO are bound
+	Vertex::bindAttributes(idx); // <-- Bind attributes while VAO/VBO are bound
 
     // Setup instance attribute (mat4 modelMatrix)
     glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
     glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW); // No data yet
-    std::size_t vec4Size = sizeof(glm::vec4);
-    GLsizei stride = sizeof(InstanceData);
-    for (int i = 0; i < 4; ++i) {
-        glEnableVertexAttribArray(3 + i);
-        glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, stride, (void*)(i * vec4Size));
-        glVertexAttribDivisor(3 + i, 1);
-    }
+    InstanceData::bindAttributes(idx);
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    return true;
+
+	return idx > 0;
 }
 
-void Model::drawInstanced(const std::vector<InstanceData>& instances) const
+void Model::draw() const
 {
     texture.bind(0);
     glBindVertexArray(VAO);
@@ -83,11 +91,4 @@ void Model::drawInstanced(const std::vector<InstanceData>& instances) const
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glDrawArraysInstanced(GL_TRIANGLES, 0, 6, static_cast<GLsizei>(instances.size()));
     glBindVertexArray(0);
-}
-
-void Model::draw() const
-{
-    texture.bind(0);
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
 }

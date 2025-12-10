@@ -4,6 +4,7 @@
 #include "Vertex.hpp"
 #include "Shader.hpp"
 #include "Model.hpp"
+#include "Camera.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -31,6 +32,7 @@ int main()
 		return -1;
 	}
 
+	glEnable(GL_DEPTH_TEST);
 	glViewport(0, 0, 800, 600);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
@@ -43,6 +45,8 @@ int main()
 			std::cout << "Failed to load shaders" << std::endl;
 			return -1;
 		}
+
+		Camera cam;
 
 		std::vector<Model> models(2);
 
@@ -60,6 +64,7 @@ int main()
 			std::cout << "Failed to load texture for model 0" << std::endl;
 			return -1;
 		}
+
 		if(!models[1].loadTexture("textures/awesomeface.png"))
 		{
 			std::cout << "Failed to load texture for model 1" << std::endl;
@@ -75,19 +80,23 @@ int main()
 			}
 		}
 
-		std::vector<std::vector<InstanceData>> instanceGroups(models.size());
-		// Example: create 3 instances for each model with different transforms
-		for(size_t i = 0; i < models.size(); ++i)
+		InstanceData inst{};
+		inst.translation = glm::vec3(-0.5f, -0.5f, 0.0f);
+		inst.rotation = glm::vec3(0.0f);
+		inst.scale = glm::vec3(0.4f);
+
+		for(auto& model : models)
 		{
-			for(int j = 0; j <= 3; ++j)
+			for(int j = 0; j < 2; j++)
 			{
-				InstanceData inst{};
-				glm::mat4 model = glm::mat4(1.0f);
-				model = glm::translate(model, glm::vec3(j * 0.7f, i * 0.3f, 0.0f));
-				model = glm::scale(model, glm::vec3(0.5f));
-				inst.model = model;
-				instanceGroups[i].push_back(inst);
+				inst.translation += glm::vec3(j * 0.5f, 0.0f, 0.0f);
+				if(!model.instantiate(inst))
+				{
+					std::cout << "Failed to instantiate model" << std::endl;
+					return -1;
+				}
 			}
+			inst.translation += glm::vec3(0.0f, 0.5f, 0.0f);
 		}
 
 		while(!glfwWindowShouldClose(window))
@@ -95,12 +104,16 @@ int main()
 			processInput(window);
 
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-			glClear(GL_COLOR_BUFFER_BIT);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			shader.use(0);
+			glm::mat4 proj = cam.getProj();
+			shader.setMat4fv("projection", &proj[0][0]);
+			glm::mat4 view = cam.getView();
+			shader.setMat4fv("view", &view[0][0]);
 
-			for(size_t i = 0; i < models.size(); ++i)
-				models[i].drawInstanced(instanceGroups[i]);
+			for(const auto& model : models)
+				model.draw();
 
 			glfwSwapBuffers(window);
 			glfwPollEvents();

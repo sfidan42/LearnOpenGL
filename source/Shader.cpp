@@ -122,6 +122,12 @@ void Shader::set3f(const std::string& name, float a, float b, float c) const
 	glUniform3f(loc, a, b, c);
 }
 
+void Shader::set1i(const std::string& name, int value) const
+{
+	const GLint loc = glGetUniformLocation(program, name.c_str());
+	glUniform1i(loc, value);
+}
+
 Shader::~Shader()
 {
 	for (auto prog : programs) {
