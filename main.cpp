@@ -8,6 +8,7 @@
 #include <glm/ext/quaternion_trigonometric.hpp>
 #include <glm/detail/type_quat.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include "Light.hpp"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -46,13 +47,16 @@ int main()
 
 	{
 		std::vector<std::string> shader_filepaths;
-		shader_filepaths.emplace_back("shaders/textured.shader");
+		shader_filepaths.emplace_back("shaders/simple.shader");
 		Shader shader;
 		if(!shader.load_shaders(shader_filepaths))
 		{
 			std::cout << "Failed to load shaders" << std::endl;
 			return -1;
 		}
+
+		Light light;
+		light.color = glm::vec3(0.1f, 0.1f, 0.1f);
 
 		std::vector<Model> models(2);
 
@@ -104,7 +108,6 @@ int main()
 		inst.rotation = glm::vec3(0.0f);
 		inst.scale = glm::vec3(0.4f);
 
-
 		for(int i = 0; i < cubePositions.size(); i++)
 		{
 			int m = i % 2;
@@ -120,20 +123,27 @@ int main()
 			}
 		}
 
+		shader.use(0);
+		shader.set1i("texSampler", 0);
+		shader.set3f("lightColor", light.color.r, light.color.g, light.color.b);
+
+
 		float lastTime = 0.0f;
 
 		while(!glfwWindowShouldClose(window))
 		{
-			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+			glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			shader.use(0);
+
 			float currentTime = static_cast<float>(glfwGetTime());
 			float deltaTime = currentTime - lastTime;
 			lastTime = currentTime;
 
 			camera.update(deltaTime);
 
+			// shader.use(0);
 			glm::mat4 proj = camera.getProj();
 			shader.setMat4fv("projection", &proj[0][0]);
 			glm::mat4 view = camera.getView();

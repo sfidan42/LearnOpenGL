@@ -4,6 +4,7 @@
 #include <iostream>
 #include <glm/gtx/euler_angles.hpp>
 #include <glm/gtc/random.hpp>
+#include <Light.hpp>
 
 void InstanceData::update(float deltaTime)
 {
@@ -112,11 +113,12 @@ bool Model::bind() const
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)), vertices.data(), GL_STATIC_DRAW);
 	Vertex::bindAttributes(idx); // <-- Bind attributes while VAO/VBO are bound
-
     // Setup instance attribute (mat4 modelMatrix)
     glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
     glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW); // No data yet
     InstanceData::bindAttributes(idx);
+
+
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);

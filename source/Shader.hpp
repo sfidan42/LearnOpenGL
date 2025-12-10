@@ -6,6 +6,8 @@
 #include <iostream>
 #include <glad/glad.h>
 
+#include "glm/vec3.hpp"
+
 class Shader
 {
 public:
