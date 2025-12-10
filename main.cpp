@@ -61,7 +61,9 @@ int main()
 
 		Light light;
 		light.position = glm::vec3(-1.2f, 1.0f, -2.0f);
-		light.color = glm::vec3(0.75f, 0.8f, 0.9f);
+		light.ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+		light.diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
+		light.specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		std::vector<Model> models(2);
 

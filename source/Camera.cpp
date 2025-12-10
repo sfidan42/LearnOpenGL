@@ -48,5 +48,4 @@ void Camera::send(const Shader& shader)
 	shader.setMat4fv("projection", &proj[0][0]);
 	shader.setMat4fv("view", &view[0][0]);
 	shader.set3f("viewPos", eye.x, eye.y, eye.z);
-
 }
