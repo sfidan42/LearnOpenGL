@@ -3,6 +3,19 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <iostream>
 #include <glm/gtx/euler_angles.hpp>
+#include <glm/gtc/random.hpp>
+
+void InstanceData::update(float deltaTime)
+{
+	rotation += glm::linearRand(glm::vec3(0.0f), glm::vec3(glm::two_pi<float>())) * 0.005f;
+
+	model = glm::mat4(1.0f);
+	model = glm::translate(model, translation);
+	model = glm::rotate(model, rotation.x, glm::vec3(1,0,0));
+	model = glm::rotate(model, rotation.y, glm::vec3(0,1,0));
+	model = glm::rotate(model, rotation.z, glm::vec3(0,0,1));
+	model = glm::scale(model, scale);
+}
 
 Model::Model()
     : VAO(0), VBO(0), instanceVBO(0)
@@ -87,7 +100,7 @@ bool Model::instantiate(const InstanceData& data)
 	if (glm::length(data.scale) <= 0.0f)
 		return false; // Invalid scale
 	instances.emplace_back(data);
-	instances.back().update();
+	instances.back().update(0.0f);
 	return true;
 }
 
@@ -111,10 +124,10 @@ bool Model::bind() const
 	return idx > 0;
 }
 
-void Model::update()
+void Model::update(float deltaTime)
 {
 	for(auto& instance : instances)
-		instance.update();
+		instance.update(deltaTime);
 }
 
 void Model::draw() const

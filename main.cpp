@@ -105,21 +105,16 @@ int main()
 		for(int i = 0; i < cubePositions.size(); i++)
 		{
 			int m = i % 2;
-
-			for(int j = 0; j < 2; j++)
+			inst.translation = cubePositions[i];
+			float angle = 20.0f * i;
+			glm::vec3 axis = glm::vec3(1.0f, 0.3f, 0.5f);
+			glm::quat quat = glm::angleAxis(glm::radians(angle), glm::normalize(axis));
+			inst.rotation = glm::eulerAngles(quat);
+			if(!models[m].instantiate(inst))
 			{
-				inst.translation = cubePositions[i];
-				float angle = 20.0f * i;
-				glm::vec3 axis = glm::vec3(1.0f, 0.3f, 0.5f);
-				glm::quat quat = glm::angleAxis(glm::radians(angle), glm::normalize(axis));
-				inst.rotation = glm::eulerAngles(quat);
-				if(!models[m].instantiate(inst))
-				{
-					std::cout << "Failed to instantiate model" << std::endl;
-					return -1;
-				}
+				std::cout << "Failed to instantiate model" << std::endl;
+				return -1;
 			}
-			inst.translation += glm::vec3(0.0f, 0.5f, 0.0f);
 		}
 
 		while(!glfwWindowShouldClose(window))
@@ -128,10 +123,10 @@ int main()
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			shader.use(0);
-			static double deltaTime = glfwGetTime();
-			deltaTime = glfwGetTime() - deltaTime;
+			static auto deltaTime = static_cast<float>(glfwGetTime());
+			deltaTime = static_cast<float>(glfwGetTime()) - deltaTime;
 
-			camera.update(static_cast<float>(deltaTime));
+			camera.update(deltaTime);
 
 			glm::mat4 proj = camera.getProj();
 			shader.setMat4fv("projection", &proj[0][0]);
@@ -140,7 +135,7 @@ int main()
 
 			for(auto& model : models)
 			{
-				model.update();
+				model.update(deltaTime);
 				model.draw();
 			}
 
@@ -156,6 +151,7 @@ int main()
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	glViewport(0, 0, width, height);
+	camera.setAspect(width, height);
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)

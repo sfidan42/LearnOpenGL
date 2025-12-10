@@ -1,28 +1,16 @@
 #pragma once
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 class Camera
 {
 public:
 	glm::vec3 speed{0.0f, 0.0f, 0.0f};
 
-	glm::mat4 getView() const
-	{
-		return glm::lookAt(eye, target, up);
-	}
+	glm::mat4 getView() const;
+	glm::mat4 getProj() const;
+	void setAspect(int width, int height);
 
-	glm::mat4 getProj() const
-	{
-		return glm::perspective(glm::radians(fov), aspect, zNear, zFar);
-	}
-
-	void update(float deltaTime)
-	{
-		const glm::vec3 delta = speed * deltaTime * 0.01f;
-		eye += delta;
-		target += delta;
-	}
+	void update(float deltaTime);
 
 private:
 	glm::vec3 eye{0.0f, 0.0f, 3.0f};
