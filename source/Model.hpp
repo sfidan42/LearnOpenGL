@@ -1,9 +1,10 @@
 #pragma once
-#include "Texture.hpp"
 #include "Vertex.hpp"
+#include "Material.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <cstddef>
+#include <memory>
 
 struct InstanceData
 {
@@ -37,10 +38,11 @@ public:
 	~Model();
 
 	bool loadGeometry();
-	bool loadTexture(const std::string& imagePath);
+	bool setMaterial(const std::shared_ptr<Material>& mat);
 	bool instantiate(const InstanceData& data);
 
-	bool bind() const;
+	void bind() const;
+	void send(const Shader& shader) const;
 	void update(float deltaTime);
 	void draw() const;
 
@@ -50,8 +52,11 @@ private:
 
 	// Model Data
 	std::vector<Vertex> vertices;
-	Texture texture{};
 	GLuint VAO;
 	GLuint VBO;
 	GLuint instanceVBO;
+
+	// Materials
+	std::shared_ptr<Material> material;
+
 };

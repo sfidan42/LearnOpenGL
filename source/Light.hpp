@@ -12,12 +12,7 @@ public:
 	glm::vec3 diffuse{0.5f, 0.5f, 0.5f};
 	glm::vec3 specular = {1.0f, 1.0f, 1.0f};
 
-	Light();
-	~Light();
-
-	void bind() const;
 	void send(const Shader& shader) const;
-
 private:
 	GLuint VAO = -1;
 };

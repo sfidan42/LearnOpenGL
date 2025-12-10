@@ -1,7 +1,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
-#include "Vertex.hpp"
 #include "Shader.hpp"
 #include "Model.hpp"
 #include "Camera.hpp"
@@ -24,7 +23,7 @@ int main()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWwindow* window = glfwCreateWindow(800, 600, "LearnOpenGL", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(1200, 720, "LearnOpenGL", nullptr, nullptr);
 	if(window == nullptr)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -33,23 +32,23 @@ int main()
 	}
 	glfwMakeContextCurrent(window);
 
-	if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 	{
 		std::cout << "Failed to initialize GLAD" << std::endl;
 		return -1;
 	}
 
 	glEnable(GL_DEPTH_TEST);
-	glViewport(0, 0, 800, 600);
+	glViewport(0, 0, 1200, 720);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	{
-		std::vector shader_filepaths = {
-			std::string("shaders/simple.shader"),
-			std::string("shaders/material.shader"),
+		std::vector<std::string> shader_filepaths = {
+			"shaders/simple.shader",
+			"shaders/material.shader",
 		};
 
 		Shader shader;
@@ -60,7 +59,7 @@ int main()
 		}
 
 		Light light;
-		light.position = glm::vec3(-1.2f, 1.0f, -2.0f);
+		light.position = glm::vec3(-0.8f, 1.0f, -1.0f);
 		light.ambient = glm::vec3(0.2f, 0.2f, 0.2f);
 		light.diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
 		light.specular = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -76,36 +75,39 @@ int main()
 			}
 		}
 
-		if(!models[0].loadTexture("textures/container.jpg"))
-		{
-			std::cout << "Failed to load texture for model 0" << std::endl;
-			return -1;
-		}
+		std::vector<std::string> textureFiles = {
+			"textures/awesomeface.png",
+			"textures/container2.png",
+			"textures/container2_specular.png"
+		};
 
-		if(!models[1].loadTexture("textures/awesomeface.png"))
-		{
-			std::cout << "Failed to load texture for model 1" << std::endl;
-			return -1;
-		}
+		std::vector<Texture> textures(textureFiles.size());
 
-		for(auto& model : models)
+		for(int i = 0; i < textureFiles.size(); i++)
 		{
-			if(!model.bind())
+			if(!textures[i].load(textureFiles[i]))
 			{
-				std::cout << "Failed to bind model" << std::endl;
+				std::cout << "Failed to load texture: " << textureFiles[i] << std::endl;
 				return -1;
 			}
 		}
 
+		std::shared_ptr<Material> materials[2];
+		materials[0] = std::make_shared<Material>(textures[0], textures[0]);
+		materials[1] =  std::make_shared<Material>(textures[1], textures[2]);
+
+		materials[0]->shininess = 32.0f;
+		materials[0]->ambient = glm::vec3(0.2f, 0.2f, 0.31f);
+
+		materials[1]->shininess = 128.0f;
+		materials[1]->ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+
+		models[0].setMaterial(materials[0]);
+		models[1].setMaterial(materials[1]);
+
 		std::vector cubePositions = {
 			glm::vec3(0.0f, 0.0f, 0.0f),
-			glm::vec3(2.0f, 5.0f, -15.0f),
-			glm::vec3(-1.5f, -2.2f, -2.5f),
 			glm::vec3(-3.8f, -2.0f, -12.3f),
-			glm::vec3(2.4f, -0.4f, -3.5f),
-			glm::vec3(-1.7f, 3.0f, -7.5f),
-			glm::vec3(1.3f, -2.0f, -2.5f),
-			glm::vec3(1.5f, 2.0f, -2.5f),
 			glm::vec3(1.5f, 0.2f, -1.5f),
 			glm::vec3(-1.3f, 1.0f, -1.5f)
 		};
@@ -130,18 +132,10 @@ int main()
 			}
 		}
 
-		Material mat{
-			.shininess = 32.0f,
-			.ambient = glm::vec3(1.0f, 0.5f, 0.31f),
-			.diffuse = glm::vec3(1.0f, 0.5f, 0.31f),
-			.specular = glm::vec3(0.5f, 0.5f, 0.5f)
-		};
-
 		shader.use(1);
-		shader.set1i("texSampler", 0);
-
 		light.send(shader);
-		mat.send(shader);
+		for(auto& model : models)
+			model.send(shader);
 
 		float lastTime = 0.0f;
 
@@ -159,6 +153,7 @@ int main()
 
 			for(auto& model : models)
 			{
+				model.bind();
 				model.update(deltaTime);
 				model.draw();
 			}
