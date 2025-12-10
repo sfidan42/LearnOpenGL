@@ -1,7 +1,7 @@
 #include "Model.hpp"
 #include <glad/glad.h>
-#include <glm/ext/matrix_transform.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
+#include <iostream>
 #include <glm/gtx/euler_angles.hpp>
 
 Model::Model()
@@ -21,30 +21,59 @@ Model::~Model()
 
 bool Model::loadGeometry()
 {
-	std::vector<glm::vec3> positions = {
-		{-0.5f, -0.5f, 0.0f}, // bottom left
-		{0.5f, -0.5f, 0.0f}, // bottom right
-		{0.5f, 0.5f, 0.0f}, // top right
-		{0.5f, 0.5f, 0.0f}, // top right
-		{-0.5f, 0.5f, 0.0f}, // top left
-		{-0.5f, -0.5f, 0.0f}, // bottom left
-	};
-	std::vector<glm::vec2> texCoords = {
-		{0.0f, 0.0f}, // bottom left
-		{1.0f, 0.0f}, // bottom right
-		{1.0f, 1.0f}, // top right
-		{1.0f, 1.0f}, // top right
-		{0.0f, 1.0f}, // top left
-		{0.0f, 0.0f}, // bottom left
-	};
+	float verts[] = {
+		-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+		 0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+		 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+		 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+		-0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
 
-	uint32_t n = std::min<uint32_t>(texCoords.size(), positions.size());
+		-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+		 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+		 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+		 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+		-0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+
+		-0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+		-0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+		-0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+		 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+		 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+		 0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+		 0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+		 0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+		 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+		-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+		 0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+		 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+		 0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+
+		-0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+		 0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+		 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+		 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+		-0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+		-0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+	};
+	constexpr size_t n = sizeof(verts) / (5 * sizeof(float));
 	vertices.resize(n);
 	for(uint32_t i = 0; i < n; i++)
 	{
-		vertices[i].position = positions[i];
-		vertices[i].texCoord = texCoords[i];
+		const glm::vec3 position(verts[i * 5 + 0], verts[i * 5 + 1], verts[i * 5 + 2]);
+		const glm::vec2 texCoord(verts[i * 5 + 3], verts[i * 5 + 4]);
+		vertices[i].position = position;
+		vertices[i].texCoord = texCoord;
 	}
+	std::cout << "Loaded " << vertices.size() << " vertices." << std::endl;
 	return true;
 }
 
@@ -58,7 +87,7 @@ bool Model::instantiate(const InstanceData& data)
 	if (glm::length(data.scale) <= 0.0f)
 		return false; // Invalid scale
 	instances.emplace_back(data);
-	instances.back().setup();
+	instances.back().update();
 	return true;
 }
 
@@ -82,6 +111,12 @@ bool Model::bind() const
 	return idx > 0;
 }
 
+void Model::update()
+{
+	for(auto& instance : instances)
+		instance.update();
+}
+
 void Model::draw() const
 {
     texture.bind(0);
@@ -89,6 +124,6 @@ void Model::draw() const
     glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(instances.size() * sizeof(InstanceData)), instances.data(), GL_DYNAMIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, static_cast<GLsizei>(instances.size()));
+    glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size()), static_cast<GLsizei>(instances.size()));
     glBindVertexArray(0);
 }

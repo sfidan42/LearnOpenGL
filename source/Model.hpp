@@ -19,24 +19,24 @@ struct InstanceData
 		{
 			glEnableVertexAttribArray(idx);
 			glVertexAttribPointer(idx, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
-								  (void*)(offsetof(InstanceData, modelMatrix) + sizeof(glm::vec4) * i));
+								  (void*)(offsetof(InstanceData, model) + sizeof(glm::vec4) * i));
 			glVertexAttribDivisor(idx, 1); // Advance per instance
 			idx++;
 		}
 	}
 
-	void setup()
+	void update()
 	{
-		modelMatrix = glm::mat4(1.0f);
-		modelMatrix = glm::translate(modelMatrix, translation);
-		modelMatrix = glm::rotate(modelMatrix, rotation.x, glm::vec3(1,0,0));
-		modelMatrix = glm::rotate(modelMatrix, rotation.y, glm::vec3(0,1,0));
-		modelMatrix = glm::rotate(modelMatrix, rotation.z, glm::vec3(0,0,1));
-		modelMatrix = glm::scale(modelMatrix, scale);
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, translation);
+		model = glm::rotate(model, rotation.x, glm::vec3(1,0,0));
+		model = glm::rotate(model, rotation.y, glm::vec3(0,1,0));
+		model = glm::rotate(model, rotation.z, glm::vec3(0,0,1));
+		model = glm::scale(model, scale);
 	}
 
 private: // send to GPU only
-	glm::mat4 modelMatrix;
+	glm::mat4 model;
 };
 
 class Model
@@ -50,6 +50,7 @@ public:
 	bool instantiate(const InstanceData& data);
 
 	bool bind() const;
+	void update();
 	void draw() const;
 
 private:

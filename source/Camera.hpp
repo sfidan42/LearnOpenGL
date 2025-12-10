@@ -5,12 +5,11 @@
 class Camera
 {
 public:
-	Camera() : eye(0.0f, 0.0f, 3.0f), center(0.0f, 0.0f, 0.0f), up(0.0f, 1.0f, 0.0f), aspect(800.0f/600.0f), fov(45.0f), zNear(0.1f), zFar(100.0f) {}
-	~Camera() = default;
+	glm::vec3 speed{0.0f, 0.0f, 0.0f};
 
 	glm::mat4 getView() const
 	{
-		return glm::lookAt(eye, center, up);
+		return glm::lookAt(eye, target, up);
 	}
 
 	glm::mat4 getProj() const
@@ -18,12 +17,19 @@ public:
 		return glm::perspective(glm::radians(fov), aspect, zNear, zFar);
 	}
 
+	void update(float deltaTime)
+	{
+		const glm::vec3 delta = speed * deltaTime * 0.01f;
+		eye += delta;
+		target += delta;
+	}
+
 private:
-	glm::vec3 eye;
-	glm::vec3 center;
-	glm::vec3 up;
-	float aspect;
-	float fov;
-	float zNear;
-	float zFar;
+	glm::vec3 eye{0.0f, 0.0f, 3.0f};
+	glm::vec3 target{0.0f, 0.0f, 0.0f};
+	glm::vec3 up{0.0f, 1.0f, 0.0f};
+	float aspect{800.0f / 600.0f};
+	float fov{45.0f};
+	float zNear{0.1f};
+	float zFar{100.0f};
 };
