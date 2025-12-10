@@ -1,19 +1,25 @@
 #pragma once
 #include <glm/glm.hpp>
 
+#include "Shader.hpp"
+
 class Camera
 {
 public:
 	glm::vec3 speed{0.0f, 0.0f, 0.0f};
 
-	glm::mat4 getView() const;
-	glm::mat4 getProj() const;
 	void setAspect(int width, int height);
 
 	void mouse(float xoffset, float yoffset);
 	void update(float deltaTime);
 
+	void send(const Shader& shader);
+
 private:
+	glm::mat4 getView() const;
+	glm::mat4 getProj() const;
+	glm::vec3 getPosition() const { return eye; }
+
 	// motion
 	glm::vec3 eye{0.0f, 0.0f, 3.0f};
 	glm::vec3 target{0.0f, 0.0f, 0.0f};

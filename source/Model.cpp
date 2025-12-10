@@ -128,8 +128,10 @@ bool Model::bind() const
 
 void Model::update(float deltaTime)
 {
+	int i = 0;
 	for(auto& instance : instances)
-		instance.update(deltaTime);
+		if (i++ % 2)
+			instance.update(deltaTime);
 }
 
 void Model::draw() const

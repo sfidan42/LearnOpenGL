@@ -21,6 +21,7 @@ public:
 
 	void setMat4fv(const std::string& name, const float* value) const;
 	void set3f(const std::string& name, float a, float b, float c) const;
+	void set1f(const std::string& name, float value) const;
 	void set1i(const std::string& name, int value) const;
 
 private:

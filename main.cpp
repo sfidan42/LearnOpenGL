@@ -9,6 +9,7 @@
 #include <glm/detail/type_quat.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include "Light.hpp"
+#include "Material.hpp"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -46,8 +47,11 @@ int main()
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	{
-		std::vector<std::string> shader_filepaths;
-		shader_filepaths.emplace_back("shaders/simple.shader");
+		std::vector shader_filepaths = {
+			std::string("shaders/simple.shader"),
+			std::string("shaders/material.shader"),
+		};
+
 		Shader shader;
 		if(!shader.load_shaders(shader_filepaths))
 		{
@@ -56,8 +60,8 @@ int main()
 		}
 
 		Light light;
-		light.position = glm::vec3(1.2f, 1.0f, 2.0f);
-		light.color = glm::vec3(1.0f, 0.7f, 0.8f);
+		light.position = glm::vec3(-1.2f, 1.0f, -2.0f);
+		light.color = glm::vec3(0.75f, 0.8f, 0.9f);
 
 		std::vector<Model> models(2);
 
@@ -107,7 +111,7 @@ int main()
 		InstanceData inst{};
 		inst.translation = glm::vec3(-0.5f, -0.5f, 0.0f);
 		inst.rotation = glm::vec3(0.0f);
-		inst.scale = glm::vec3(0.4f);
+		inst.scale = glm::vec3(0.80f);
 
 		for(int i = 0; i < cubePositions.size(); i++)
 		{
@@ -124,11 +128,18 @@ int main()
 			}
 		}
 
-		shader.use(0);
-		shader.set1i("texSampler", 0);
-		shader.set3f("lightColor", light.color.r, light.color.g, light.color.b);
-		shader.set3f("lightPos", light.position.r, light.position.g, light.position.b);
+		Material mat{
+			.shininess = 32.0f,
+			.ambient = glm::vec3(1.0f, 0.5f, 0.31f),
+			.diffuse = glm::vec3(1.0f, 0.5f, 0.31f),
+			.specular = glm::vec3(0.5f, 0.5f, 0.5f)
+		};
 
+		shader.use(1);
+		shader.set1i("texSampler", 0);
+
+		light.send(shader);
+		mat.send(shader);
 
 		float lastTime = 0.0f;
 
@@ -137,19 +148,12 @@ int main()
 			glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			shader.use(0);
-
 			float currentTime = static_cast<float>(glfwGetTime());
 			float deltaTime = currentTime - lastTime;
 			lastTime = currentTime;
 
 			camera.update(deltaTime);
-
-			// shader.use(0);
-			glm::mat4 proj = camera.getProj();
-			shader.setMat4fv("projection", &proj[0][0]);
-			glm::mat4 view = camera.getView();
-			shader.setMat4fv("view", &view[0][0]);
+			camera.send(shader);
 
 			for(auto& model : models)
 			{

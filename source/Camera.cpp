@@ -40,3 +40,13 @@ void Camera::update(float deltaTime)
 
 	target = eye + front;
 }
+
+void Camera::send(const Shader& shader)
+{
+	glm::mat4 proj = getProj();
+	glm::mat4 view = getView();
+	shader.setMat4fv("projection", &proj[0][0]);
+	shader.setMat4fv("view", &view[0][0]);
+	shader.set3f("viewPos", eye.x, eye.y, eye.z);
+
+}
