@@ -56,7 +56,8 @@ int main()
 		}
 
 		Light light;
-		light.color = glm::vec3(0.1f, 0.1f, 0.1f);
+		light.position = glm::vec3(1.2f, 1.0f, 2.0f);
+		light.color = glm::vec3(1.0f, 0.7f, 0.8f);
 
 		std::vector<Model> models(2);
 
@@ -126,6 +127,7 @@ int main()
 		shader.use(0);
 		shader.set1i("texSampler", 0);
 		shader.set3f("lightColor", light.color.r, light.color.g, light.color.b);
+		shader.set3f("lightPos", light.position.r, light.position.g, light.position.b);
 
 
 		float lastTime = 0.0f;
