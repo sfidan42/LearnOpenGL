@@ -22,3 +22,7 @@ To build and run the code, follow these steps:
 4. Open the project in Clion.
 
 ![clion_open_project](assets/clion.png)
+
+5. Screenshots of the project:
+   1. After finishing "Lighting" section of the book:
+    ![multiple lights](assets/multiple_lights.png)

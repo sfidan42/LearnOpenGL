@@ -8,8 +8,6 @@
 
 void InstanceData::update(float deltaTime)
 {
-	rotation += glm::linearRand(glm::vec3(0.0f), glm::vec3(glm::two_pi<float>())) * 0.001f;
-
 	model = glm::mat4(1.0f);
 	model = glm::translate(model, translation);
 	model = glm::rotate(model, rotation.x, glm::vec3(1, 0, 0));
