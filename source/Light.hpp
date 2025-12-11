@@ -4,15 +4,41 @@
 
 #include "Shader.hpp"
 
-class Light
-{
-public:
-	glm::vec3 position{1.2f, 1.0f, 2.0f};
-	glm::vec3 ambient{0.2f, 0.2f, 0.2f};
-	glm::vec3 diffuse{0.5f, 0.5f, 0.5f};
-	glm::vec3 specular = {1.0f, 1.0f, 1.0f};
+struct DirLight {
+    glm::vec3 direction;
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
+};
 
-	void send(const Shader& shader) const;
-private:
-	GLuint VAO = -1;
+struct PointLight {
+    glm::vec3 position;
+    float constant;
+    float linear;
+    float quadratic;
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
+};
+
+struct SpotLight {
+    glm::vec3 position;
+    glm::vec3 direction;
+    float cutOff;
+    float outerCutOff;
+    float constant;
+    float linear;
+    float quadratic;
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
+};
+
+class LightManager {
+public:
+    DirLight dirLight;
+    std::vector<PointLight> pointLights;
+    std::vector<SpotLight> spotLights;
+
+    void send(const Shader& shader) const;
 };

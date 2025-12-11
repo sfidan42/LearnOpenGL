@@ -15,6 +15,9 @@ public:
 
 	void send(const Shader& shader);
 
+	glm::vec3 getPosition() { return eye; }
+	glm::vec3 getDirection() { return glm::normalize(target - eye); }
+
 private:
 	glm::mat4 getView() const;
 	glm::mat4 getProj() const;
