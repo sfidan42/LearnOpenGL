@@ -18,10 +18,11 @@ target_include_directories(glad PUBLIC vendored/glad/include)
 
 target_include_directories(${PNAME}
         PUBLIC
-            vendored/glfw-3.4/include
-            vendored/glm
-            vendored/stb
-            ${CMAKE_SOURCE_DIR}/source
+        vendored/glfw-3.4/include
+        vendored/glm
+        vendored/stb
+        vendored/assimp/include
+        ${CMAKE_SOURCE_DIR}/source
 )
 
 target_link_libraries(${PNAME}
@@ -29,6 +30,7 @@ target_link_libraries(${PNAME}
         glad
         ${CMAKE_DL_LIBS}
         ${CMAKE_SOURCE_DIR}/vendored/glfw-3.4/libglfw3.a
+        ${CMAKE_SOURCE_DIR}/vendored/assimp/libassimp.so
 )
 
 add_definitions(-DDATA_DIR="${CMAKE_SOURCE_DIR}/data")
