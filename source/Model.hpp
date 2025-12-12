@@ -15,7 +15,7 @@
 
 using namespace std;
 
-unsigned int TextureFromFile(const char* path, const string& directory, bool gamma = false);
+unsigned int TextureFromFile(const char* path, const string& directory);
 
 class Model
 {
@@ -25,10 +25,8 @@ public:
 	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
 	vector<Mesh> meshes;
 	string directory;
-	bool gammaCorrection;
 
 	Model(const string& path)
-	: gammaCorrection(false)
 	{
 		loadModel(path);
 		std::cout << "Model loaded successfully from: " << path << std::endl;
@@ -44,8 +42,8 @@ public:
 
 	void draw(Shader& shader)
 	{
-		for(auto& meshe : meshes)
-			meshe.draw(shader);
+		for(auto& mesh : meshes)
+			mesh.draw(shader);
 	}
 
 private:
@@ -78,7 +76,7 @@ private:
 			aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 			meshes.push_back(processMesh(mesh, scene));
 		}
-		// after we've processed all of the meshes (if any) we then recursively process each of the children nodes
+		// after we've processed all the meshes (if any) we then recursively process each of the children nodes
 		for(unsigned int i = 0; i < node->mNumChildren; i++)
 		{
 			processNode(node->mChildren[i], scene);
@@ -152,7 +150,7 @@ private:
 		textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
 		// return a mesh object created from the extracted mesh data
-		return Mesh(vertices, indices, textures);
+		return {vertices, indices, textures};
 	}
 
 	vector<Texture> loadMaterialTextures(aiMaterial* mat, aiTextureType type,
@@ -231,17 +229,31 @@ private:
 
 						if(data)
 						{
-							GLenum format;
-							if(nrComponents == 1)
-								format = GL_RED;
-							else if(nrComponents == 3)
-								format = GL_RGB;
-							else if(nrComponents == 4)
-								format = GL_RGBA;
-							else
-								format = GL_RGB;
+							// Choose proper internal format and data format based on number of components
+							GLint format;
+							switch(nrComponents)
+							{
+								case 1: format = GL_RED;
+									break;
+								case 2: format = GL_RG;
+									break;
+								case 3: format = GL_RGB;
+									break;
+								case 4: format = GL_RGBA;
+									break;
+								default: format = (-1);
+									break; // Defensive default
+							}
 
-							glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+							if(format == -1)
+							{
+								std::cout << "Unsupported number of image components: " << nrComponents << std::endl;
+							}
+							else
+							{
+								glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format,
+											 GL_UNSIGNED_BYTE, data);
+							}
 							glGenerateMipmap(GL_TEXTURE_2D);
 
 							glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -291,28 +303,41 @@ private:
 	}
 };
 
-inline unsigned int TextureFromFile(const char* path, const string& directory, bool gamma)
+inline unsigned int TextureFromFile(const char* path, const string& directory)
 {
 	string filename = string(path);
 	filename = directory + '/' + filename;
 
-	unsigned int textureID;
+	unsigned int textureID = 0;
 	glGenTextures(1, &textureID);
 
 	int width, height, nrComponents;
 	unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
 	if(data)
 	{
-		GLenum format;
-		if(nrComponents == 1)
-			format = GL_RED;
-		else if(nrComponents == 3)
-			format = GL_RGB;
-		else if(nrComponents == 4)
-			format = GL_RGBA;
+		// Choose proper internal format and data format based on number of components
+		GLint format = GL_RGB;
+		switch(nrComponents)
+		{
+			case 1: format = GL_RED;
+				break;
+			case 2: format = GL_RG;
+				break;
+			case 3: format = GL_RGB;
+				break;
+			case 4: format = GL_RGBA;
+				break;
+			default: format = (-1);
+				break; // Defensive default
+		}
 
 		glBindTexture(GL_TEXTURE_2D, textureID);
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+		if(format == -1)
+			std::cout << "Unsupported number of image components when loading '" << path << "': " << nrComponents <<
+				std::endl;
+		else
+			glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+
 		glGenerateMipmap(GL_TEXTURE_2D);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);

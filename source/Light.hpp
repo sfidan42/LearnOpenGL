@@ -40,7 +40,10 @@ struct SpotLight
 class LightManager
 {
 public:
-	DirLight dirLight;
+	LightManager();
+	~LightManager() = default;
+
+	DirLight dirLight{};
 	std::vector<PointLight> pointLights;
 	std::vector<SpotLight> spotLights;
 

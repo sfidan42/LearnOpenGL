@@ -37,25 +37,42 @@ public:
 
 	void draw(const Shader& shader)
 	{
-		// bind appropriate textures
-		bool hasDiffuse = false;
-		bool hasSpecular = false;
-		for(int i = 0; i < textures.size(); i++)
+		// Bind multiple diffuse textures into sampler array u_diffuseTextures and set count
+		const unsigned int MAX_DIFFUSE = 16; // must match shader array size
+		unsigned int texUnit = 0;
+		unsigned int diffuseCount = 0;
+
+		for(int i = 0; i < static_cast<int>(textures.size()); i++)
 		{
-			glActiveTexture(GL_TEXTURE0 + i); // active proper texture unit before binding
-			// retrieve texture number (the N in diffuse_textureN)
-			string number;
-			string name = textures[i].type;
-			if(name == "diffuse")
-				hasDiffuse = true;
+			const string &name = textures[i].type;
+			if(name == "diffuse" && diffuseCount < MAX_DIFFUSE)
+			{
+				glActiveTexture(GL_TEXTURE0 + texUnit);
+				glBindTexture(GL_TEXTURE_2D, textures[i].id);
+				// set sampler for array element
+				shader.set1i(string("u_diffuseTextures[") + to_string(diffuseCount) + string("]"), texUnit);
+				++diffuseCount;
+				++texUnit;
+			}
 			else if(name == "specular")
-				hasSpecular = true;
-			shader.set1i(("material." + name), i);
-			glBindTexture(GL_TEXTURE_2D, textures[i].id);
+			{
+				// bind specular to a single sampler if present (backwards-compatible)
+				glActiveTexture(GL_TEXTURE0 + texUnit);
+				glBindTexture(GL_TEXTURE_2D, textures[i].id);
+				shader.set1i("u_specular", texUnit);
+				++texUnit;
+			}
+			else
+			{
+				// For any other texture types, bind them but don't set specific uniforms by default
+				glActiveTexture(GL_TEXTURE0 + texUnit);
+				glBindTexture(GL_TEXTURE_2D, textures[i].id);
+				++texUnit;
+			}
 		}
-		shader.set1b("material.hasDiffuse", hasDiffuse);
-		shader.set1b("material.hasSpecular", hasSpecular);
-		shader.set1f("material.shininess", 32.0f);
+
+		// tell shader how many diffuse textures are bound
+		shader.set1i("u_numDiffuseTextures", static_cast<int>(diffuseCount));
 
 		// draw mesh
 		glBindVertexArray(VAO);
