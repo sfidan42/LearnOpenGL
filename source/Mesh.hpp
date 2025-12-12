@@ -34,6 +34,7 @@ public:
 
 		setupMesh();
 	}
+
 	void Draw(Shader& shader)
 	{
 		// bind appropriate textures
@@ -52,6 +53,15 @@ public:
 			shader.set1i(("material." + name + number).c_str(), i);
 			glBindTexture(GL_TEXTURE_2D, textures[i].id);
 		}
+		if(diffuseNr > 1)
+			shader.set1f("material.hasDiffuse", 1.0f);
+		else
+			shader.set1f("material.hasDiffuse", 0.0f);
+		if(specularNr > 1)
+			shader.set1f("material.hasSpecular", 1.0f);
+		else
+			shader.set1f("material.hasSpecular", 0.0f);
+
 		shader.set1f("material.shininess", 32.0f);
 
 		// draw mesh

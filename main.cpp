@@ -48,7 +48,7 @@ int main()
 
 	{
 		std::vector<std::string> shader_filepaths = {
-			"shaders/multiple_lights.shader",
+			"shaders/blinn_phong.shader",
 		};
 
 		Shader shader;
@@ -61,7 +61,7 @@ int main()
 		LightManager lightManager;
 
 		// Directional light from bottom
-		lightManager.dirLight.direction = glm::vec3(0.0f, -1.0f, 0.0f);
+		lightManager.dirLight.direction = glm::vec3(0.0f, 1.0f, 0.0f);
 		lightManager.dirLight.ambient = glm::vec3(0.1f, 0.1f, 0.1f);
 		lightManager.dirLight.diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
 		lightManager.dirLight.specular = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -109,11 +109,11 @@ int main()
 			"/models/interior_tiles_1k.glb",
 		};
 		std::vector<Model> models;
-		models.emplace_back(path + modelPaths[0]);
-		models.emplace_back(path + modelPaths[1]);
+		for (const auto& modelPath : modelPaths)
+			models.emplace_back(path + modelPath);
 
 		float spacing = 2.0f;
-		std::vector<glm::vec3> cubePositions = {
+		std::vector cubePositions = {
 			spacing * glm::vec3(0.0f, 0.0f, 0.0f),
 			spacing * glm::vec3(2.0f, 5.0f, -15.0f),
 			spacing * glm::vec3(-1.5f, -2.2f, -2.5f),

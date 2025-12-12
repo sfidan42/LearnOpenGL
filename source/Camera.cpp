@@ -21,7 +21,7 @@ void Camera::mouse(float xoffset, float yoffset)
 {
 	yaw += xoffset * sensitivity;
 	pitch += yoffset * sensitivity;
-	pitch = glm::clamp(pitch, -90.0f, 90.0f);
+	pitch = glm::clamp(pitch, -89.99f, 89.99f);
 }
 
 void Camera::update(float deltaTime)
