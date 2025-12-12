@@ -23,6 +23,7 @@ public:
 	void set3f(const std::string& name, float a, float b, float c) const;
 	void set1f(const std::string& name, float value) const;
 	void set1i(const std::string& name, int value) const;
+	void set1b(const std::string& name, bool value) const;
 
 private:
 	void config(GLuint count);

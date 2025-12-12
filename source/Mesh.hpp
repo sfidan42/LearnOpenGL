@@ -35,33 +35,26 @@ public:
 		setupMesh();
 	}
 
-	void Draw(Shader& shader)
+	void draw(const Shader& shader)
 	{
 		// bind appropriate textures
-		unsigned int diffuseNr = 1;
-		unsigned int specularNr = 1;
-		for(unsigned int i = 0; i < textures.size(); i++)
+		bool hasDiffuse = false;
+		bool hasSpecular = false;
+		for(int i = 0; i < textures.size(); i++)
 		{
 			glActiveTexture(GL_TEXTURE0 + i); // active proper texture unit before binding
 			// retrieve texture number (the N in diffuse_textureN)
 			string number;
 			string name = textures[i].type;
-			if(name == "texture_diffuse")
-				number = to_string(diffuseNr++);
-			else if(name == "texture_specular")
-				number = to_string(specularNr++);
-			shader.set1i(("material." + name + number).c_str(), i);
+			if(name == "diffuse")
+				hasDiffuse = true;
+			else if(name == "specular")
+				hasSpecular = true;
+			shader.set1i(("material." + name), i);
 			glBindTexture(GL_TEXTURE_2D, textures[i].id);
 		}
-		if(diffuseNr > 1)
-			shader.set1f("material.hasDiffuse", 1.0f);
-		else
-			shader.set1f("material.hasDiffuse", 0.0f);
-		if(specularNr > 1)
-			shader.set1f("material.hasSpecular", 1.0f);
-		else
-			shader.set1f("material.hasSpecular", 0.0f);
-
+		shader.set1b("material.hasDiffuse", hasDiffuse);
+		shader.set1b("material.hasSpecular", hasSpecular);
 		shader.set1f("material.shininess", 32.0f);
 
 		// draw mesh

@@ -42,10 +42,10 @@ public:
 		std::cout << "----------------------------------------" << std::endl;
 	}
 
-	void Draw(Shader& shader)
+	void draw(Shader& shader)
 	{
 		for(auto& meshe : meshes)
-			meshe.Draw(shader);
+			meshe.draw(shader);
 	}
 
 private:
@@ -144,11 +144,11 @@ private:
 		// normal: texture_normalN
 
 		// 1. diffuse maps
-		vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse", scene);
+		vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "diffuse", scene);
 		textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
 		// 2. specular maps
 		vector<Texture> specularMaps =
-			loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular", scene);
+			loadMaterialTextures(material, aiTextureType_SPECULAR, "specular", scene);
 		textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
 		// return a mesh object created from the extracted mesh data

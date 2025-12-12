@@ -25,12 +25,12 @@ void main()
 #version 460 core
 
 struct Material {
-    sampler2D texture_diffuse1;
-    sampler2D texture_specular1;
+    sampler2D diffuse;
+    sampler2D specular;
     float shininess;
 
-    float hasDiffuse;     // added
-    float hasSpecular;    // added
+    bool hasDiffuse;
+    bool hasSpecular;
 };
 
 struct DirLight {
@@ -97,13 +97,20 @@ void main()
     vec3 norm = normalize(Normal);
     vec3 viewDir = normalize(viewPos - FragPos);
 
+    // Directional light
     vec3 result = CalcDirLight(dirLight, norm, viewDir);
 
+    // Point lights
     for(int i = 0; i < NR_POINT_LIGHTS; i++)
         result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
 
+    // Spotlights
     for(int i = 0; i < NR_SPOT_LIGHTS; i++)
         result += CalcSpotLight(spotLights[i], norm, FragPos, viewDir);
+
+    // Gamma correction
+    float gamma = 2.2;
+    result = pow(result, vec3(1.0 / gamma));
 
     FragColor = vec4(result, 1.0);
 }
@@ -113,16 +120,16 @@ void main()
 
 vec3 GetDiffuseColor()
 {
-    if (material.hasDiffuse > 0.5)
-        return vec3(texture(material.texture_diffuse1, TexCoord));
+    if (material.hasDiffuse)
+        return vec3(texture(material.diffuse, TexCoord));
     else
         return vec3(1.0); // fallback color (white)
 }
 
 vec3 GetSpecularColor()
 {
-    if (material.hasSpecular > 0.5)
-        return vec3(texture(material.texture_specular1, TexCoord));
+    if (material.hasSpecular)
+        return vec3(texture(material.specular, TexCoord));
     else
         return vec3(0.0); // fallback (black = no specular)
 }

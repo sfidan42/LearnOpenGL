@@ -68,7 +68,7 @@ int main()
 
 		// Point light in corner
 		lightManager.pointLights.resize(1);
-		lightManager.pointLights[0].position = glm::vec3(6.0f, 2.0f, 6.0f);
+		lightManager.pointLights[0].position = glm::vec3(5.0f, 1.0f, 5.0f);
 		lightManager.pointLights[0].ambient = glm::vec3(0.3f, 0.3f, 0.3f);
 		lightManager.pointLights[0].diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
 		lightManager.pointLights[0].specular = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -151,13 +151,13 @@ int main()
 				float angle = 20.0f * i;
 				model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 				shader.setMat4fv("model", &model[0][0]);
-				models[0].Draw(shader);
+				models[0].draw(shader);
 			}
 			model = glm::mat4(1.0f);
 			model = glm::translate(model, glm::vec3(0.0f, -1.5f, 0.0f));
 			model = glm::scale(model, glm::vec3(10.0f));
 			shader.setMat4fv("model", &model[0][0]);
-			models[1].Draw(shader);
+			models[1].draw(shader);
 
 			glfwSwapBuffers(window);
 			glfwPollEvents();
