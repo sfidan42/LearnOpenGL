@@ -64,9 +64,8 @@ int main()
 		lightManager.dirLight.direction = glm::vec3(0.0f, -1.0f, 0.0f);
 		lightManager.dirLight.ambient = glm::vec3(0.1f, 0.1f, 0.1f);
 		lightManager.dirLight.diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-		lightManager.dirLight.specular = glm::vec3(1.0f,  1.0f, 1.0f);
+		lightManager.dirLight.specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		/*
 		// Point light in corner
 		lightManager.pointLights.resize(1);
 		lightManager.pointLights[0].position = glm::vec3(6.0f, 2.0f, 6.0f);
@@ -103,11 +102,15 @@ int main()
 			lightManager.spotLights[i].cutOff = glm::cos(glm::radians(12.5f));
 			lightManager.spotLights[i].outerCutOff = glm::cos(glm::radians(15.0f));
 		}
-		*/
 
 		std::string path(DATA_DIR);
-		path += "/models/backpack/backpack.obj";
-		Model myModel(path);
+		std::vector modelPaths = {
+			"/models/backpack/backpack.obj",
+			"/models/interior_tiles_1k.glb",
+		};
+		std::vector<Model> models;
+		models.emplace_back(path + modelPaths[0]);
+		models.emplace_back(path + modelPaths[1]);
 
 		float spacing = 2.0f;
 		std::vector<glm::vec3> cubePositions = {
@@ -148,8 +151,13 @@ int main()
 				float angle = 20.0f * i;
 				model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 				shader.setMat4fv("model", &model[0][0]);
-				myModel.Draw(shader);
+				models[0].Draw(shader);
 			}
+			model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(0.0f, -1.5f, 0.0f));
+			model = glm::scale(model, glm::vec3(10.0f));
+			shader.setMat4fv("model", &model[0][0]);
+			models[1].Draw(shader);
 
 			glfwSwapBuffers(window);
 			glfwPollEvents();
