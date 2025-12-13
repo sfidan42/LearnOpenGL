@@ -13,7 +13,7 @@ struct Vertex
 
 struct Texture
 {
-	unsigned int id;
+	GLuint id;
 	string type;
 	string path;
 };
@@ -69,13 +69,13 @@ public:
 		int diffuseCount = 0;
 		int specularCount = 0;
 
-		for(int i = 0; i < static_cast<int>(material->textures.size()); i++)
+		for(const auto & texture : material->textures)
 		{
-			const string& name = material->textures[i].type;
+			const string& name = texture.type;
 			if(name == "diffuse" && diffuseCount < MAX_DIFFUSE)
 			{
 				glActiveTexture(GL_TEXTURE0 + texUnit);
-				glBindTexture(GL_TEXTURE_2D, material->textures[i].id);
+				glBindTexture(GL_TEXTURE_2D, texture.id);
 				// set sampler for array element
 				shader.setInt(string("u_diffuseTextures[") + to_string(diffuseCount) + string("]"), texUnit);
 				++diffuseCount;
@@ -85,7 +85,7 @@ public:
 			{
 				// bind specular to a single sampler if present (backwards-compatible)
 				glActiveTexture(GL_TEXTURE0 + texUnit);
-				glBindTexture(GL_TEXTURE_2D, material->textures[i].id);
+				glBindTexture(GL_TEXTURE_2D, texture.id);
 				shader.setInt(string("u_specularTextures[") + to_string(specularCount) + string("]"), texUnit);
 				++specularCount;
 				++texUnit;
@@ -94,7 +94,7 @@ public:
 			{
 				// For any other texture types, bind them but don't set specific uniforms by default
 				glActiveTexture(GL_TEXTURE0 + texUnit);
-				glBindTexture(GL_TEXTURE_2D, material->textures[i].id);
+				glBindTexture(GL_TEXTURE_2D, texture.id);
 				++texUnit;
 			}
 		}
@@ -114,7 +114,7 @@ public:
 
 private:
 	//  render data
-	unsigned int VAO, VBO, EBO;
+	unsigned int VAO{}, VBO{}, EBO{};
 
 	void setupMesh()
 	{

@@ -15,29 +15,27 @@
 
 using namespace std;
 
-void processTexture(unsigned char* data, int width, int height, int nrComponents);
+bool processTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID);
 unsigned int TextureFromFile(const char* path, const string& directory);
 
 class Model
 {
 public:
-	// model data
-	vector<Texture> textures_loaded;
-	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
-	vector<Mesh> meshes;
-	vector<Material*> materials;
-	string directory;
-
-	Model(const string& path)
+	explicit Model(const string& modelPath)
 	{
-		loadModel(path);
-		std::cout << "Model loaded successfully from: " << path << std::endl;
+		std::cout << "------------------Model-------------------" << std::endl;
+		loadModel(modelPath);
 		std::cout << "Number of meshes: " << meshes.size() << std::endl;
 		std::cout << "Number of textures loaded: " << textures_loaded.size() << std::endl;
-		std::cout << "----------------------------------------" << std::endl;
-		for(Texture& tex : textures_loaded)
+		for(auto& [id, type, path] : textures_loaded)
+			std::cout << "\tTexture ID: " << id << ", Type: " << type << ", Path: " << path << std::endl;
+		std::cout << "Number of materials: " << materials.size() << std::endl;
+		for (int i = 0; i < materials.size(); i++)
 		{
-			std::cout << "Texture ID: " << tex.id << ", Type: " << tex.type << ", Path: " << tex.path << std::endl;
+			std::cout << "\tMaterial " << i << " has " << materials[i]->textures.size() << " textures:" << std::endl;
+			for(auto& [id, type, path] : materials[i]->textures)
+				std::cout << "\t\tTexture ID: " << id << ", Type: " << type << ", Path: " << path <<
+					std::endl;
 		}
 		std::cout << "----------------------------------------" << std::endl;
 	}
@@ -49,12 +47,18 @@ public:
 	}
 
 private:
-	void loadModel(const string& path)
+	vector<Texture> textures_loaded;
+	vector<Mesh> meshes;
+	vector<Material*> materials;
+	string directory;
+
+	void loadModel(const string& modelPath)
 	{
 		// read file via ASSIMP
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(
-			path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_TransformUVCoords | aiProcess_FlipUVs);
+			modelPath,
+			aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_TransformUVCoords | aiProcess_FlipUVs);
 		// check for errors
 		if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
 		{
@@ -62,10 +66,11 @@ private:
 			return;
 		}
 		// retrieve the directory path of the filepath
-		directory = path.substr(0, path.find_last_of('/'));
+		directory = modelPath.substr(0, modelPath.find_last_of('/'));
 
 		// process ASSIMP's root node recursively
 		processNode(scene->mRootNode, scene);
+		std::cout << "Model loaded successfully from: " << modelPath << std::endl;
 	}
 
 	void processNode(aiNode* node, const aiScene* scene)
@@ -90,7 +95,7 @@ private:
 		// data to fill
 		vector<Vertex> vertices;
 		vector<unsigned int> indices;
-		Material* mat = new Material();
+		auto* mat = new Material();
 
 		// walk through each of the mesh's vertices
 		for(unsigned int i = 0; i < mesh->mNumVertices; i++)
@@ -165,11 +170,11 @@ private:
 			mat->GetTexture(type, i, &str);
 			// check if texture was loaded before and if so, continue to next iteration: skip loading a new texture
 			bool skip = false;
-			for(unsigned int j = 0; j < textures_loaded.size(); j++)
+			for(auto& j : textures_loaded)
 			{
-				if(std::strcmp(textures_loaded[j].path.data(), str.C_Str()) == 0)
+				if(std::strcmp(j.path.data(), str.C_Str()) == 0)
 				{
-					textures.push_back(textures_loaded[j]);
+					textures.push_back(j);
 					skip = true;
 					// a texture with the same filepath has already been loaded, continue to next one. (optimization)
 					break;
@@ -186,12 +191,13 @@ private:
 				{
 					// parse index after '*'
 					char* endptr = nullptr;
-					long texIndexLong = strtol(texPath + 1, &endptr, 10);
-					int texIndex = (int)texIndexLong;
-					if(endptr != (texPath + 1) && scene->mTextures && texIndex >= 0 && texIndex < (int)scene->
-						mNumTextures)
+					const long texIndexLong = strtol(texPath + 1, &endptr, 10);
+					int texIndex = static_cast<int>(texIndexLong);
+					if(endptr != (texPath + 1) && scene->mTextures && texIndex >= 0 && texIndex < static_cast<int>(scene
+						->
+						mNumTextures))
 					{
-						aiTexture* atex = scene->mTextures[texIndex];
+						const aiTexture* atex = scene->mTextures[texIndex];
 
 						unsigned int textureID;
 						glGenTextures(1, &textureID);
@@ -207,7 +213,7 @@ private:
 							// atex->mWidth stores size in bytes and pcData points to that memory
 							unsigned int size = atex->mWidth;
 							data = stbi_load_from_memory(
-								reinterpret_cast<unsigned char*>(const_cast<void*>(reinterpret_cast<const void*>(atex->
+								static_cast<unsigned char*>(const_cast<void*>(reinterpret_cast<const void*>(atex->
 									pcData))), (int)size, &width, &height, &nrComponents, 0);
 						}
 						else
@@ -216,11 +222,11 @@ private:
 							width = static_cast<int>(atex->mWidth);
 							height = static_cast<int>(atex->mHeight);
 							nrComponents = 4; // aiTexel has r,g,b,a
-							size_t bufSize = (size_t)width * (size_t)height * 4;
-							data = (unsigned char*)malloc(bufSize);
+							const size_t bufSize = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+							data = static_cast<unsigned char*>(malloc(bufSize));
 							dataAllocated = true;
-							auto texels = reinterpret_cast<aiTexel*>(atex->pcData);
-							for(size_t p = 0; p < (size_t)width * (size_t)height; ++p)
+							const auto texels = reinterpret_cast<aiTexel*>(atex->pcData);
+							for(size_t p = 0; p < static_cast<size_t>(width) * static_cast<size_t>(height); ++p)
 							{
 								data[p * 4 + 0] = texels[p].r;
 								data[p * 4 + 1] = texels[p].g;
@@ -229,55 +235,13 @@ private:
 							}
 						}
 
+						texture.id = 0;
 						if(data)
 						{
-							// Choose proper internal format and data format based on number of components
-							GLint format;
-							switch(nrComponents)
-							{
-								case 1: format = GL_RED;
-									break;
-								case 2: format = GL_RG;
-									break;
-								case 3: format = GL_RGB;
-									break;
-								case 4: format = GL_RGBA;
-									break;
-								default: format = (-1);
-									break; // Defensive default
-							}
-
-							if(format == -1)
-							{
-								std::cout << "Unsupported number of image components: " << nrComponents << std::endl;
-							}
-							else
-							{
-								glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format,
-											 GL_UNSIGNED_BYTE, data);
-							}
-							glGenerateMipmap(GL_TEXTURE_2D);
-
-							glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-							glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-							glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-							glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-							if(nrComponents == 0)
-								std::cout << "Warning: embedded texture had 0 components" << std::endl;
-
-							// free image data
-							if(dataAllocated)
-								free(data);
-							else
-								stbi_image_free(data);
-
+							if(!processTexture(data, width, height, nrComponents, textureID))
+								std::cout << "Failed to process embedded texture at path: " << texPath << std::endl;
+							dataAllocated ? free(data) : stbi_image_free(data);
 							texture.id = textureID;
-						}
-						else
-						{
-							std::cout << "Embedded texture failed to load at path: " << texPath << std::endl;
-							texture.id = 0;
 						}
 
 						texture.type = typeName;
@@ -302,9 +266,39 @@ private:
 	}
 };
 
-inline void processTexture(unsigned char* data, int width, int height, int nrComponents)
+inline bool processTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID)
 {
+	// Choose proper internal format and data format based on number of components
+	GLint format = GL_RGB;
+	switch(nrComponents)
+	{
+		case 1: format = GL_RED;
+			break;
+		case 2: format = GL_RG;
+			break;
+		case 3: format = GL_RGB;
+			break;
+		case 4: format = GL_RGBA;
+			break;
+		default: format = (-1);
+			break; // Defensive default
+	}
 
+	glBindTexture(GL_TEXTURE_2D, textureID);
+	if(format == -1)
+		std::cout << "Unsupported number of image components while processing the texture: " << nrComponents <<
+			std::endl;
+	else
+		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	return format != -1;
 }
 
 inline unsigned int TextureFromFile(const char* path, const string& directory)
@@ -319,36 +313,8 @@ inline unsigned int TextureFromFile(const char* path, const string& directory)
 	unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
 	if(data)
 	{
-		// Choose proper internal format and data format based on number of components
-		GLint format = GL_RGB;
-		switch(nrComponents)
-		{
-			case 1: format = GL_RED;
-				break;
-			case 2: format = GL_RG;
-				break;
-			case 3: format = GL_RGB;
-				break;
-			case 4: format = GL_RGBA;
-				break;
-			default: format = (-1);
-				break; // Defensive default
-		}
-
-		glBindTexture(GL_TEXTURE_2D, textureID);
-		if(format == -1)
-			std::cout << "Unsupported number of image components when loading '" << path << "': " << nrComponents <<
-				std::endl;
-		else
-			glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-
-		glGenerateMipmap(GL_TEXTURE_2D);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
+		if(!processTexture(data, width, height, nrComponents, textureID))
+			std::cout << "Failed to process texture at path: " << path << std::endl;
 		stbi_image_free(data);
 	}
 	else
