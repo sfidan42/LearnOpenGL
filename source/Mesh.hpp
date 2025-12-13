@@ -18,19 +18,45 @@ struct Texture
 	string path;
 };
 
+struct Material
+{
+	vector<Texture> textures;
+};
+
+inline Material* addMaterial(vector<Material*>& materials, Material* inMat)
+{
+	auto same = [](const Material* a, const Material* b) -> bool
+	{
+		if(a->textures.size() != b->textures.size())
+			return false;
+		for(int i = 0; i < a->textures.size(); i++)
+			if(a->textures[i].id != b->textures[i].id)
+				return false;
+		return true;
+	};
+
+	for(Material* material : materials)
+		if(same(material, inMat))
+			return material;
+	materials.push_back(inMat);
+	return materials.back();
+}
+
 class Mesh
 {
 public:
 	// mesh data
 	vector<Vertex> vertices;
 	vector<unsigned int> indices;
-	vector<Texture> textures;
+	const Material* material;
 
-	Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures)
+	Mesh(const vector<Vertex>& vertices, const vector<unsigned int>& indices, const Material* material)
 	{
 		this->vertices = vertices;
 		this->indices = indices;
-		this->textures = textures;
+		this->material = material;
+
+		assert(material != nullptr && "Mesh material pointer is null");
 
 		setupMesh();
 	}
@@ -42,13 +68,13 @@ public:
 		unsigned int texUnit = 0;
 		unsigned int diffuseCount = 0;
 
-		for(int i = 0; i < static_cast<int>(textures.size()); i++)
+		for(int i = 0; i < static_cast<int>(material->textures.size()); i++)
 		{
-			const string &name = textures[i].type;
+			const string& name = material->textures[i].type;
 			if(name == "diffuse" && diffuseCount < MAX_DIFFUSE)
 			{
 				glActiveTexture(GL_TEXTURE0 + texUnit);
-				glBindTexture(GL_TEXTURE_2D, textures[i].id);
+				glBindTexture(GL_TEXTURE_2D, material->textures[i].id);
 				// set sampler for array element
 				shader.set1i(string("u_diffuseTextures[") + to_string(diffuseCount) + string("]"), texUnit);
 				++diffuseCount;
@@ -58,7 +84,7 @@ public:
 			{
 				// bind specular to a single sampler if present (backwards-compatible)
 				glActiveTexture(GL_TEXTURE0 + texUnit);
-				glBindTexture(GL_TEXTURE_2D, textures[i].id);
+				glBindTexture(GL_TEXTURE_2D, material->textures[i].id);
 				shader.set1i("u_specular", texUnit);
 				++texUnit;
 			}
@@ -66,7 +92,7 @@ public:
 			{
 				// For any other texture types, bind them but don't set specific uniforms by default
 				glActiveTexture(GL_TEXTURE0 + texUnit);
-				glBindTexture(GL_TEXTURE_2D, textures[i].id);
+				glBindTexture(GL_TEXTURE_2D, material->textures[i].id);
 				++texUnit;
 			}
 		}

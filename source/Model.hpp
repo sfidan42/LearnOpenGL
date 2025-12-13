@@ -24,6 +24,7 @@ public:
 	vector<Texture> textures_loaded;
 	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
 	vector<Mesh> meshes;
+	vector<Material*> materials;
 	string directory;
 
 	Model(const string& path)
@@ -88,7 +89,7 @@ private:
 		// data to fill
 		vector<Vertex> vertices;
 		vector<unsigned int> indices;
-		vector<Texture> textures;
+		Material* mat = new Material();
 
 		// walk through each of the mesh's vertices
 		for(unsigned int i = 0; i < mesh->mNumVertices; i++)
@@ -143,14 +144,14 @@ private:
 
 		// 1. diffuse maps
 		vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "diffuse", scene);
-		textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+		mat->textures.insert(mat->textures.end(), diffuseMaps.begin(), diffuseMaps.end());
 		// 2. specular maps
 		vector<Texture> specularMaps =
 			loadMaterialTextures(material, aiTextureType_SPECULAR, "specular", scene);
-		textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+		mat->textures.insert(mat->textures.end(), specularMaps.begin(), specularMaps.end());
 
 		// return a mesh object created from the extracted mesh data
-		return {vertices, indices, textures};
+		return {vertices, indices, addMaterial(materials, mat)};
 	}
 
 	vector<Texture> loadMaterialTextures(aiMaterial* mat, aiTextureType type,
