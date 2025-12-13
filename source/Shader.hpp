@@ -1,12 +1,8 @@
 #pragma once
 #include <vector>
 #include <string>
-#include <fstream>
-#include <sstream>
-#include <iostream>
 #include <glad/glad.h>
-
-#include "glm/vec3.hpp"
+#include <glm/glm.hpp>
 
 class Shader
 {
@@ -14,16 +10,14 @@ public:
 	Shader() = default;
 	~Shader();
 
-	bool load_shaders(const std::vector<std::string>& filepaths);
+	bool loadShaders(const std::vector<std::string>& filepaths);
 	void use(unsigned int index);
 
-	[[nodiscard]] uint32_t get_num_shaders() const { return static_cast<uint32_t>(programs.size()); }
-
-	void setMat4fv(const std::string& name, const float* value) const;
-	void set3f(const std::string& name, float a, float b, float c) const;
-	void set1f(const std::string& name, float value) const;
-	void set1i(const std::string& name, int value) const;
-	void set1b(const std::string& name, bool value) const;
+	void setMat4(const std::string& name, const glm::mat4& matrix) const;
+	void setVec3(const std::string& name, const glm::vec3& vec) const;
+	void setFloat(const std::string& name, float value) const;
+	void setInt(const std::string& name, int value) const;
+	void setBool(const std::string& name, int value) const;
 
 private:
 	void config(GLuint count);

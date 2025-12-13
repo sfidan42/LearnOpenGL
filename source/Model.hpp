@@ -15,6 +15,7 @@
 
 using namespace std;
 
+void processTexture(unsigned char* data, int width, int height, int nrComponents);
 unsigned int TextureFromFile(const char* path, const string& directory);
 
 class Model
@@ -41,7 +42,7 @@ public:
 		std::cout << "----------------------------------------" << std::endl;
 	}
 
-	void draw(Shader& shader)
+	void draw(const Shader& shader)
 	{
 		for(auto& mesh : meshes)
 			mesh.draw(shader);
@@ -285,10 +286,7 @@ private:
 						textures_loaded.push_back(texture);
 						continue; // processed embedded texture, go to next
 					}
-					else
-					{
-						std::cout << "Embedded texture index out of range: " << texPath << std::endl;
-					}
+					std::cout << "Embedded texture index out of range: " << texPath << std::endl;
 				}
 
 				// fallback: try loading texture from file on disk
@@ -303,6 +301,11 @@ private:
 		return textures;
 	}
 };
+
+inline void processTexture(unsigned char* data, int width, int height, int nrComponents)
+{
+
+}
 
 inline unsigned int TextureFromFile(const char* path, const string& directory)
 {

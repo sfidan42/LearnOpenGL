@@ -20,15 +20,15 @@ LightManager::LightManager()
 	pointLights[0].linear = 0.09f;
 	pointLights[0].quadratic = 0.032f;
 
-	// Spot lights around center, pointing to floor center
+	// Spotlights around center, pointing to floor center
 	spotLights.resize(3);
-	glm::vec3 center = glm::vec3(0.0f, -1.0f, 0.0f); // Floor center
-	glm::vec3 spotPositions[] = {
+	constexpr glm::vec3 center = glm::vec3(0.0f, -1.0f, 0.0f); // Floor center
+	constexpr glm::vec3 spotPositions[] = {
 		glm::vec3(5.0f, 2.0f, 5.0f),
 		glm::vec3(-5.0f, 2.0f, 5.0f),
 		glm::vec3(0.0f, 2.0f, -5.0f)
 	};
-	glm::vec3 spotColors[] = {
+	constexpr glm::vec3 spotColors[] = {
 		glm::vec3(1.0f, 0.0f, 0.0f), // Red
 		glm::vec3(0.0f, 1.0f, 0.0f), // Green
 		glm::vec3(0.0f, 0.0f, 1.0f) // Blue
@@ -46,52 +46,42 @@ LightManager::LightManager()
 		spotLights[i].cutOff = glm::cos(glm::radians(12.5f));
 		spotLights[i].outerCutOff = glm::cos(glm::radians(15.0f));
 	}
-
 }
 
 void LightManager::send(const Shader& shader) const
 {
 	// Send directional light
-	shader.set3f("dirLight.direction", dirLight.direction.x, dirLight.direction.y, dirLight.direction.z);
-	shader.set3f("dirLight.ambient", dirLight.ambient.x, dirLight.ambient.y, dirLight.ambient.z);
-	shader.set3f("dirLight.diffuse", dirLight.diffuse.x, dirLight.diffuse.y, dirLight.diffuse.z);
-	shader.set3f("dirLight.specular", dirLight.specular.x, dirLight.specular.y, dirLight.specular.z);
+	shader.setVec3("dirLight.direction", dirLight.direction);
+	shader.setVec3("dirLight.ambient", dirLight.ambient);
+	shader.setVec3("dirLight.diffuse", dirLight.diffuse);
+	shader.setVec3("dirLight.specular", dirLight.specular);
 
 	// Send point lights
 	for(size_t i = 0; i < pointLights.size(); ++i)
 	{
 		std::string base = "pointLights[" + std::to_string(i) + "]";
-		shader.set3f((base + ".position").c_str(), pointLights[i].position.x, pointLights[i].position.y,
-					 pointLights[i].position.z);
-		shader.set1f((base + ".constant").c_str(), pointLights[i].constant);
-		shader.set1f((base + ".linear").c_str(), pointLights[i].linear);
-		shader.set1f((base + ".quadratic").c_str(), pointLights[i].quadratic);
-		shader.set3f((base + ".ambient").c_str(), pointLights[i].ambient.x, pointLights[i].ambient.y,
-					 pointLights[i].ambient.z);
-		shader.set3f((base + ".diffuse").c_str(), pointLights[i].diffuse.x, pointLights[i].diffuse.y,
-					 pointLights[i].diffuse.z);
-		shader.set3f((base + ".specular").c_str(), pointLights[i].specular.x, pointLights[i].specular.y,
-					 pointLights[i].specular.z);
+		shader.setVec3(base + ".position", pointLights[i].position);
+		shader.setFloat(base + ".constant", pointLights[i].constant);
+		shader.setFloat(base + ".linear", pointLights[i].linear);
+		shader.setFloat(base + ".quadratic", pointLights[i].quadratic);
+		shader.setVec3(base + ".ambient", pointLights[i].ambient);
+		shader.setVec3(base + ".diffuse", pointLights[i].diffuse);
+		shader.setVec3(base + ".specular", pointLights[i].specular);
 	}
 
-	// Send spot lights
+	// Send spotlights
 	for(size_t i = 0; i < spotLights.size(); ++i)
 	{
 		std::string base = "spotLights[" + std::to_string(i) + "]";
-		shader.set3f((base + ".position").c_str(), spotLights[i].position.x, spotLights[i].position.y,
-					 spotLights[i].position.z);
-		shader.set3f((base + ".direction").c_str(), spotLights[i].direction.x, spotLights[i].direction.y,
-					 spotLights[i].direction.z);
-		shader.set1f((base + ".cutOff").c_str(), spotLights[i].cutOff);
-		shader.set1f((base + ".outerCutOff").c_str(), spotLights[i].outerCutOff);
-		shader.set1f((base + ".constant").c_str(), spotLights[i].constant);
-		shader.set1f((base + ".linear").c_str(), spotLights[i].linear);
-		shader.set1f((base + ".quadratic").c_str(), spotLights[i].quadratic);
-		shader.set3f((base + ".ambient").c_str(), spotLights[i].ambient.x, spotLights[i].ambient.y,
-					 spotLights[i].ambient.z);
-		shader.set3f((base + ".diffuse").c_str(), spotLights[i].diffuse.x, spotLights[i].diffuse.y,
-					 spotLights[i].diffuse.z);
-		shader.set3f((base + ".specular").c_str(), spotLights[i].specular.x, spotLights[i].specular.y,
-					 spotLights[i].specular.z);
+		shader.setVec3(base + ".position", spotLights[i].position);
+		shader.setVec3(base + ".direction", spotLights[i].direction);
+		shader.setFloat(base + ".cutOff", spotLights[i].cutOff);
+		shader.setFloat(base + ".outerCutOff", spotLights[i].outerCutOff);
+		shader.setFloat(base + ".constant", spotLights[i].constant);
+		shader.setFloat(base + ".linear", spotLights[i].linear);
+		shader.setFloat(base + ".quadratic", spotLights[i].quadratic);
+		shader.setVec3(base + ".ambient", spotLights[i].ambient);
+		shader.setVec3(base + ".diffuse", spotLights[i].diffuse);
+		shader.setVec3(base + ".specular", spotLights[i].specular);
 	}
 }

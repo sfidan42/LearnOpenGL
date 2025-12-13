@@ -65,8 +65,9 @@ public:
 	{
 		// Bind multiple diffuse textures into sampler array u_diffuseTextures and set count
 		const unsigned int MAX_DIFFUSE = 16; // must match shader array size
-		unsigned int texUnit = 0;
-		unsigned int diffuseCount = 0;
+		int texUnit = 0;
+		int diffuseCount = 0;
+		int specularCount = 0;
 
 		for(int i = 0; i < static_cast<int>(material->textures.size()); i++)
 		{
@@ -76,7 +77,7 @@ public:
 				glActiveTexture(GL_TEXTURE0 + texUnit);
 				glBindTexture(GL_TEXTURE_2D, material->textures[i].id);
 				// set sampler for array element
-				shader.set1i(string("u_diffuseTextures[") + to_string(diffuseCount) + string("]"), texUnit);
+				shader.setInt(string("u_diffuseTextures[") + to_string(diffuseCount) + string("]"), texUnit);
 				++diffuseCount;
 				++texUnit;
 			}
@@ -85,7 +86,8 @@ public:
 				// bind specular to a single sampler if present (backwards-compatible)
 				glActiveTexture(GL_TEXTURE0 + texUnit);
 				glBindTexture(GL_TEXTURE_2D, material->textures[i].id);
-				shader.set1i("u_specular", texUnit);
+				shader.setInt(string("u_specularTextures[") + to_string(specularCount) + string("]"), texUnit);
+				++specularCount;
 				++texUnit;
 			}
 			else
@@ -98,7 +100,8 @@ public:
 		}
 
 		// tell shader how many diffuse textures are bound
-		shader.set1i("u_numDiffuseTextures", static_cast<int>(diffuseCount));
+		shader.setInt("u_numDiffuseTextures", diffuseCount);
+		shader.setInt("u_numSpecularTextures", specularCount);
 
 		// draw mesh
 		glBindVertexArray(VAO);

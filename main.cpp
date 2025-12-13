@@ -42,12 +42,11 @@ int main()
 
 	{
 		std::vector<std::string> shader_filepaths = {
-			"shaders/basic.shader",
 			"shaders/full.shader",
 		};
 
 		Shader shader;
-		if(!shader.load_shaders(shader_filepaths))
+		if(!shader.loadShaders(shader_filepaths))
 		{
 			std::cout << "Failed to load shaders" << std::endl;
 			return -1;
@@ -102,13 +101,13 @@ int main()
 				float angle = 20.0f * i;
 				model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
 				model = glm::scale(model, glm::vec3(0.2f));
-				shader.setMat4fv("model", &model[0][0]);
+				shader.setMat4("model", model);
 				models[0].draw(shader);
 			}
 			model = glm::mat4(1.0f);
 			model = glm::translate(model, glm::vec3(0.0f, -1.5f, 0.0f));
 			model = glm::scale(model, glm::vec3(10.0f));
-			shader.setMat4fv("model", &model[0][0]);
+			shader.setMat4("model", model);
 			models[1].draw(shader);
 
 			glfwSwapBuffers(window);

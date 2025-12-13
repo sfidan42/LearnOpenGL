@@ -1,9 +1,13 @@
 #include "Shader.hpp"
+#include "error_macro.hpp"
+#include <fstream>
+#include <iostream>
+#include <sstream>
 
-bool Shader::load_shaders(const std::vector<std::string>& filepaths)
+bool Shader::loadShaders(const std::vector<std::string>& filepaths)
 {
 	config(filepaths.size());
-	for (const std::string& filepath : filepaths)
+	for(const std::string& filepath : filepaths)
 		read(filepath);
 	return create();
 }
@@ -67,18 +71,80 @@ static bool compile(GLuint shader, const char* shader_source)
 	return true;
 }
 
+Shader::~Shader()
+{
+	for(const GLuint prog : programs)
+		glDeleteProgram(prog);
+}
+
+void Shader::use(const unsigned int index)
+{
+	if(index >= programs.size())
+	{
+		std::cerr << "Invalid program index: " << index << std::endl;
+		return;
+	}
+	program = programs[index];
+	GL_CHECK(glUseProgram(program));
+}
+
+void Shader::setMat4(const std::string& name, const glm::mat4& matrix) const
+{
+	const GLint loc = glGetUniformLocation(program, name.c_str());
+	GL_CHECK(glUniformMatrix4fv(loc, 1, GL_FALSE, &matrix[0][0]));
+}
+
+void Shader::setVec3(const std::string& name, const glm::vec3& vec) const
+{
+	const GLint loc = glGetUniformLocation(program, name.c_str());
+	GL_CHECK(glUniform3fv(loc, 1, &vec[0]));
+}
+
+void Shader::setFloat(const std::string& name, const float value) const
+{
+	const GLint loc = glGetUniformLocation(program, name.c_str());
+	GL_CHECK(glUniform1f(loc, value));
+}
+
+void Shader::setInt(const std::string& name, const int value) const
+{
+	const GLint loc = glGetUniformLocation(program, name.c_str());
+	GL_CHECK(glUniform1i(loc, value));
+}
+
+void Shader::setBool(const std::string& name, const int value) const
+{
+	const GLint loc = glGetUniformLocation(program, name.c_str());
+	GL_CHECK(glUniform1i(loc, value));
+}
+
 bool Shader::create()
 {
 	int success;
 	char infoLog[512];
 
-	for(auto & shader : shaders)
+	for(auto& [vertex, fragment] : shaders)
 	{
-		const char* vertexShaderSource = shader.vertex.c_str();
-		const char* fragmentShaderSource = shader.fragment.c_str();
-		unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-		unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-		unsigned int shaderProgram = glCreateProgram();
+		const char* vertexShaderSource = vertex.c_str();
+		const char* fragmentShaderSource = fragment.c_str();
+		const GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+		if(vertexShader == 0)
+		{
+			std::cerr << "Failed to create vertex shader" << std::endl;
+			return false;
+		}
+		const GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+		if(fragmentShader == 0)
+		{
+			std::cerr << "Failed to create fragment shader" << std::endl;
+			return false;
+		}
+		GLuint shaderProgram = glCreateProgram();
+		if(shaderProgram == 0)
+		{
+			std::cerr << "Failed to create shader program" << std::endl;
+			return false;
+		}
 
 		if(!compile(vertexShader, vertexShaderSource) || !compile(fragmentShader, fragmentShaderSource))
 			return false;
@@ -97,52 +163,4 @@ bool Shader::create()
 		programs.push_back(shaderProgram);
 	}
 	return true;
-}
-
-void Shader::use(unsigned int index)
-{
-	if(index >= programs.size())
-	{
-		std::cerr << "Invalid program index: " << index << std::endl;
-		return;
-	}
-	program = programs[index];
-	glUseProgram(program);
-}
-
-void Shader::setMat4fv(const std::string& name, const float* value) const
-{
-	const GLint loc = glGetUniformLocation(program, name.c_str());
-	glUniformMatrix4fv(loc, 1, GL_FALSE, value);
-}
-
-void Shader::set3f(const std::string& name, float a, float b, float c) const
-{
-	const GLint loc = glGetUniformLocation(program, name.c_str());
-	glUniform3f(loc, a, b, c);
-}
-
-void Shader::set1f(const std::string& name, float value) const
-{
-	const GLint loc = glGetUniformLocation(program, name.c_str());
-	glUniform1f(loc, value);
-}
-
-void Shader::set1i(const std::string& name, int value) const
-{
-	const GLint loc = glGetUniformLocation(program, name.c_str());
-	glUniform1i(loc, value);
-}
-
-void Shader::set1b(const std::string& name, bool value) const
-{
-	const GLint loc = glGetUniformLocation(program, name.c_str());
-	glUniform1i(loc, static_cast<int>(value));
-}
-
-Shader::~Shader()
-{
-	for (auto prog : programs) {
-		glDeleteProgram(prog);
-	}
 }
