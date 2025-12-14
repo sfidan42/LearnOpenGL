@@ -11,6 +11,11 @@ Mesh::Mesh(const vector<Vertex>& vertices, const vector<unsigned int>& indices, 
 	setupMesh();
 }
 
+Mesh::~Mesh()
+{
+	// TODO: properly mesh data
+}
+
 void Mesh::draw(const Shader& shader) const
 {
 	// Bind multiple diffuse textures into sampler array u_diffuseTextures and set count

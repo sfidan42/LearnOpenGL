@@ -72,7 +72,7 @@ Model::Model(const string& modelPath)
 	for(auto& [id, type, path] : textures_loaded)
 		cout << "\tTexture ID: " << id << ", Type: " << type << ", Path: " << path << endl;
 	cout << "Number of materials: " << materials.size() << endl;
-	for(Material* material : materials)
+	for(const Material* material : materials)
 	{
 		cout << "\tMaterial has " << material->textures.size() << " textures:" << endl;
 		for(auto& [id, type, path] : material->textures)
@@ -81,7 +81,12 @@ Model::Model(const string& modelPath)
 	cout << "----------------------------------------" << endl;
 }
 
-void Model::draw(const Shader& shader)
+Model::~Model()
+{
+	// TODO: properly free model data
+}
+
+void Model::draw(const Shader& shader) const
 {
 	for(auto& mesh : meshes)
 		mesh.draw(shader);
@@ -305,6 +310,7 @@ Material* Model::addMaterial(Material* inMat)
 {
 	auto same = [](const Material* a, const Material* b) -> bool
 	{
+		assert(a != nullptr && b != nullptr && "Material pointer is null in comparison");
 		if(a->textures.size() != b->textures.size())
 			return false;
 		for(int i = 0; i < a->textures.size(); i++)
@@ -312,10 +318,15 @@ Material* Model::addMaterial(Material* inMat)
 				return false;
 		return true;
 	};
-
+	assert(inMat != nullptr && "Input material pointer is null");
 	for(Material* material : materials)
+	{
 		if(same(material, inMat))
+		{
+			delete inMat; // avoid memory leak
 			return material;
+		}
+	}
 	materials.push_back(inMat);
 	return materials.back();
 }

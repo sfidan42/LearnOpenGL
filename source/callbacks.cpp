@@ -2,10 +2,10 @@
 
 Camera g_camera;
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebuffer_size_callback(GLFWwindow* window, const int width, const int height)
 {
 	glViewport(0, 0, width, height);
-	g_camera.setAspect(width, height);
+	g_camera.setAspect(static_cast<float>(width), static_cast<float>(height));
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)

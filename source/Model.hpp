@@ -18,8 +18,9 @@ class Model
 {
 public:
 	explicit Model(const string& modelPath);
+	~Model();
 
-	void draw(const Shader& shader);
+	void draw(const Shader& shader) const;
 
 private:
 	vector<Texture> textures_loaded;

@@ -46,6 +46,7 @@ public:
 	const Material* material;
 
 	Mesh(const vector<Vertex>& vertices, const vector<unsigned int>& indices, const Material* material);
+	~Mesh();
 
 	void draw(const Shader& shader) const;
 

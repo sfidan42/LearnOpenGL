@@ -117,5 +117,6 @@ int main()
 	} // OpenGL objects destroyed here, before context termination
 
 	glfwTerminate();
+	glfwDestroyWindow(window);
 	return 0;
 }
