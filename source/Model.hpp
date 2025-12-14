@@ -4,7 +4,7 @@
 #include <assimp/scene.h>
 #include <string>
 #include <vector>
-#include "Ecs.hpp"
+#include "Components.hpp"
 #include "Shader.hpp"
 #include <iostream>
 #include <entt/entity/registry.hpp>
@@ -32,10 +32,7 @@ public:
 	void draw(const Shader& shader) const;
 
 private:
-	//vector<Texture> textures_loaded;
-	//vector<Mesh> meshes;
 	string directory;
-
 	entt::registry registry;
 
 	void loadModel(const string& modelPath);
@@ -43,5 +40,4 @@ private:
 	void processMesh(aiMesh* mesh, const aiScene* scene);
 	vector<TextureComponent> loadMaterialTextures(aiMaterial* mat, aiTextureType type,
 										 const string& typeName, const aiScene* scene);
-
 };

@@ -1,4 +1,4 @@
-#include "Ecs.hpp"
+#include "Components.hpp"
 
 void MeshComponent::setup(const vector<Vertex>& vertices, const vector<Index>& indices,
 							  const vector<TextureComponent>& textures)

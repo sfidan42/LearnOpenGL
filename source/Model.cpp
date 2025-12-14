@@ -136,7 +136,6 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene)
 	{
 		Vertex vertex{}; // initialize to avoid uninitialized warnings
 		vec3 vector;
-		// we declare a placeholder vector since assimp uses its own vector class that doesn't directly convert to glm's vec3 class so we transfer the data to this placeholder vec3 first.
 		// positions
 		vector.x = mesh->mVertices[i].x;
 		vector.y = mesh->mVertices[i].y;
@@ -173,26 +172,16 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene)
 		for(unsigned int j = 0; j < face.mNumIndices; j++)
 			indices.push_back(face.mIndices[j]);
 	}
-	// process materials
 	aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-	// we assume a convention for sampler names in the shaders. Each diffuse texture should be named
-	// as 'texture_diffuseN' where N is a sequential number ranging from 1 to MAX_SAMPLER_NUMBER.
-	// Same applies to other texture as the following list summarizes:
-	// diffuse: texture_diffuseN
-	// specular: texture_specularN
-	// normal: texture_normalN
-
-	// 1. diffuse maps
 	vector<TextureComponent> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "diffuse", scene);
-	textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-	// 2. specular maps
 	vector<TextureComponent> specularMaps =
 		loadMaterialTextures(material, aiTextureType_SPECULAR, "specular", scene);
+
+	textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
 	textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
 	// return a mesh object created from the extracted mesh data
-	entt::entity entity = registry.create();
-	MeshComponent& meshComp = registry.emplace<MeshComponent>(entity);
+	MeshComponent& meshComp = registry.emplace<MeshComponent>(registry.create());
 	meshComp.setup(vertices, indices, textures);
 }
 
