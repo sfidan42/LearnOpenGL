@@ -31,28 +31,3 @@ struct Texture
 	string type;
 	string path;
 };
-
-struct Material
-{
-	vector<Texture> textures;
-};
-
-class Mesh
-{
-public:
-	// mesh data
-	vector<Vertex> vertices;
-	vector<Index> indices;
-	const Material* material;
-
-	Mesh(const vector<Vertex>& vertices, const vector<unsigned int>& indices, const Material* material);
-	~Mesh();
-
-	void draw(const Shader& shader) const;
-
-private:
-	//  render data
-	unsigned int VAO{}, VBO{}, EBO{};
-
-	void setupMesh();
-};

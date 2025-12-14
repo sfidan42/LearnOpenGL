@@ -1,22 +1,31 @@
-#include "Mesh.hpp"
+#include "Ecs.hpp"
 
-Mesh::Mesh(const vector<Vertex>& vertices, const vector<unsigned int>& indices, const Material* material)
+void MeshComponent::setup(const vector<Vertex>& vertices, const vector<Index>& indices,
+							  const vector<Texture>& textures)
 {
 	this->vertices = vertices;
 	this->indices = indices;
-	this->material = material;
+	this->textures = textures;
 
-	assert(material != nullptr && "Mesh material pointer is null");
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
 
-	setupMesh();
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
+				 indices.data(), GL_STATIC_DRAW);
+
+	Vertex::vertexAttributes();
+
+	glBindVertexArray(0);
 }
 
-Mesh::~Mesh()
-{
-	// TODO: properly mesh data
-}
-
-void Mesh::draw(const Shader& shader) const
+void MeshComponent::draw(const Shader& shader) const
 {
 	// Bind multiple diffuse textures into sampler array u_diffuseTextures and set count
 	const unsigned int MAX_DIFFUSE = 16; // must match shader array size
@@ -24,7 +33,7 @@ void Mesh::draw(const Shader& shader) const
 	int diffuseCount = 0;
 	int specularCount = 0;
 
-	for(const auto& texture : material->textures)
+	for(const auto& texture : textures)
 	{
 		const string& name = texture.type;
 		if(name == "diffuse" && diffuseCount < MAX_DIFFUSE)
@@ -65,24 +74,4 @@ void Mesh::draw(const Shader& shader) const
 
 	// always good practice to set everything back to defaults once configured.
 	glActiveTexture(GL_TEXTURE0);
-}
-
-void Mesh::setupMesh()
-{
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
-
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
-				 &indices[0], GL_STATIC_DRAW);
-
-	Vertex::vertexAttributes();
-
-	glBindVertexArray(0);
 }

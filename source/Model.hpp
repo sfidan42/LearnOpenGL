@@ -4,9 +4,10 @@
 #include <assimp/scene.h>
 #include <string>
 #include <vector>
-#include "Mesh.hpp"
+#include "Ecs.hpp"
 #include "Shader.hpp"
 #include <iostream>
+#include <entt/entity/registry.hpp>
 
 using namespace std;
 using namespace glm;
@@ -20,19 +21,27 @@ public:
 	explicit Model(const string& modelPath);
 	~Model();
 
+	// Delete copy constructor and copy assignment operator
+	Model(const Model&) = delete;
+	Model& operator=(const Model&) = delete;
+
+	// Implement move constructor and move assignment operator
+	Model(Model&& other) noexcept;
+	Model& operator=(Model&& other) noexcept;
+
 	void draw(const Shader& shader) const;
 
 private:
 	vector<Texture> textures_loaded;
-	vector<Mesh> meshes;
-	vector<Material*> materials;
+	//vector<Mesh> meshes;
 	string directory;
+
+	entt::registry registry;
 
 	void loadModel(const string& modelPath);
 	void processNode(aiNode* node, const aiScene* scene);
-	Mesh processMesh(aiMesh* mesh, const aiScene* scene);
+	void processMesh(aiMesh* mesh, const aiScene* scene);
 	vector<Texture> loadMaterialTextures(aiMaterial* mat, aiTextureType type,
 										 const string& typeName, const aiScene* scene);
 
-	Material* addMaterial(Material* inMat);
 };

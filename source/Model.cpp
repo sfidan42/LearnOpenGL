@@ -67,17 +67,10 @@ Model::Model(const string& modelPath)
 {
 	cout << "------------------Model-------------------" << endl;
 	loadModel(modelPath);
-	cout << "Number of meshes: " << meshes.size() << endl;
+	cout << "Number of meshes: " << registry.view<MeshComponent>().storage()->size() << endl;
 	cout << "Number of textures loaded: " << textures_loaded.size() << endl;
 	for(auto& [id, type, path] : textures_loaded)
 		cout << "\tTexture ID: " << id << ", Type: " << type << ", Path: " << path << endl;
-	cout << "Number of materials: " << materials.size() << endl;
-	for(const Material* material : materials)
-	{
-		cout << "\tMaterial has " << material->textures.size() << " textures:" << endl;
-		for(auto& [id, type, path] : material->textures)
-			cout << "\t\tTexture ID: " << id << ", Type: " << type << ", Path: " << path << endl;
-	}
 	cout << "----------------------------------------" << endl;
 }
 
@@ -88,8 +81,8 @@ Model::~Model()
 
 void Model::draw(const Shader& shader) const
 {
-	for(auto& mesh : meshes)
-		mesh.draw(shader);
+	const auto view = registry.view<MeshComponent>();
+	view.each([shader](const MeshComponent& mesh){ mesh.draw(shader); });
 }
 
 void Model::loadModel(const string& modelPath)
@@ -121,7 +114,7 @@ void Model::processNode(aiNode* node, const aiScene* scene)
 		// the node object only contains indices to index the actual objects in the scene.
 		// the scene contains all the data, node is just to keep stuff organized (like relations between nodes).
 		aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-		meshes.push_back(processMesh(mesh, scene));
+		processMesh(mesh, scene);
 	}
 	// after we've processed all the meshes (if any) we then recursively process each of the children nodes
 	for(unsigned int i = 0; i < node->mNumChildren; i++)
@@ -130,12 +123,12 @@ void Model::processNode(aiNode* node, const aiScene* scene)
 	}
 }
 
-Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
+void Model::processMesh(aiMesh* mesh, const aiScene* scene)
 {
 	// data to fill
 	vector<Vertex> vertices;
 	vector<unsigned int> indices;
-	auto* mat = new Material();
+	vector<Texture> textures;
 
 	// walk through each of the mesh's vertices
 	for(unsigned int i = 0; i < mesh->mNumVertices; i++)
@@ -190,15 +183,16 @@ Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene)
 
 	// 1. diffuse maps
 	vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "diffuse", scene);
-	mat->textures.insert(mat->textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+	textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
 	// 2. specular maps
 	vector<Texture> specularMaps =
 		loadMaterialTextures(material, aiTextureType_SPECULAR, "specular", scene);
-	mat->textures.insert(mat->textures.end(), specularMaps.begin(), specularMaps.end());
+	textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
-	Material* matRef = this->addMaterial(mat);
 	// return a mesh object created from the extracted mesh data
-	return {vertices, indices, matRef};
+	entt::entity entity = registry.create();
+	MeshComponent& meshComp = registry.emplace<MeshComponent>(entity);
+	meshComp.setup(vertices, indices, textures);
 }
 
 vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type, const string& typeName,
@@ -306,27 +300,16 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type,
 	return textures;
 }
 
-Material* Model::addMaterial(Material* inMat)
-{
-	auto same = [](const Material* a, const Material* b) -> bool
-	{
-		assert(a != nullptr && b != nullptr && "Material pointer is null in comparison");
-		if(a->textures.size() != b->textures.size())
-			return false;
-		for(int i = 0; i < a->textures.size(); i++)
-			if(a->textures[i].id != b->textures[i].id)
-				return false;
-		return true;
-	};
-	assert(inMat != nullptr && "Input material pointer is null");
-	for(Material* material : materials)
-	{
-		if(same(material, inMat))
-		{
-			delete inMat; // avoid memory leak
-			return material;
-		}
-	}
-	materials.push_back(inMat);
-	return materials.back();
+Model::Model(Model&& other) noexcept
+    : textures_loaded(std::move(other.textures_loaded)),
+      directory(std::move(other.directory)),
+      registry(std::move(other.registry)) {}
+
+Model& Model::operator=(Model&& other) noexcept {
+    if (this != &other) {
+        textures_loaded = std::move(other.textures_loaded);
+        directory = std::move(other.directory);
+        registry = std::move(other.registry);
+    }
+    return *this;
 }

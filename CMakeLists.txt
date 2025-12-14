@@ -22,6 +22,7 @@ target_include_directories(${PNAME}
         vendored/glm
         vendored/stb
         vendored/assimp/include
+        vendored/entt
         ${CMAKE_SOURCE_DIR}/source
 )
 
