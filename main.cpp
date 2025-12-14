@@ -8,6 +8,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include "Light.hpp"
 #include "callbacks.hpp"
+#include <stb_image.h>
 
 int main()
 {
@@ -19,7 +20,7 @@ int main()
 	GLFWwindow* window = glfwCreateWindow(1200, 720, "LearnOpenGL", nullptr, nullptr);
 	if(window == nullptr)
 	{
-		std::cout << "Failed to create GLFW window" << std::endl;
+		cout << "Failed to create GLFW window" << endl;
 		glfwTerminate();
 		return -1;
 	}
@@ -27,7 +28,7 @@ int main()
 
 	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 	{
-		std::cout << "Failed to initialize GLAD" << std::endl;
+		cout << "Failed to initialize GLAD" << endl;
 		return -1;
 	}
 
@@ -41,39 +42,39 @@ int main()
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	{
-		std::vector<std::string> shader_filepaths = {
-			"shaders/full.shader",
+		vector<string> shader_filepaths = {
+			"shaders/programs.glsl",
 		};
 
 		Shader shader;
 		if(!shader.loadShaders(shader_filepaths))
 		{
-			std::cout << "Failed to load shaders" << std::endl;
+			cout << "Failed to load shaders" << endl;
 			return -1;
 		}
 
 		LightManager lightManager;
 
-		std::string path(DATA_DIR);
-		std::vector modelPaths = {
+		string path(DATA_DIR);
+		vector modelPaths = {
 			"/models/backpack/backpack.obj",
 			"/models/interior_tiles_1k.glb",
 		};
-		std::vector<Model> models;
+		vector<Model> models;
 		for(const auto& modelPath : modelPaths)
 			models.emplace_back(path + modelPath);
 
-		std::vector cubePositions = {
-			glm::vec3(0.0f, 0.0f, 0.0f),
-			glm::vec3(2.0f, 5.0f, -15.0f),
-			glm::vec3(-1.5f, -2.2f, -2.5f),
-			glm::vec3(-3.8f, -2.0f, -12.3f),
-			glm::vec3(2.4f, -0.4f, -3.5f),
-			glm::vec3(-1.7f, 3.0f, -7.5f),
-			glm::vec3(1.3f, -2.0f, -2.5f),
-			glm::vec3(1.5f, 2.0f, -2.5f),
-			glm::vec3(1.5f, 0.2f, -1.5f),
-			glm::vec3(-1.3f, 1.0f, -1.5f)
+		vector cubePositions = {
+			vec3(0.0f, 0.0f, 0.0f),
+			vec3(2.0f, 5.0f, -15.0f),
+			vec3(-1.5f, -2.2f, -2.5f),
+			vec3(-3.8f, -2.0f, -12.3f),
+			vec3(2.4f, -0.4f, -3.5f),
+			vec3(-1.7f, 3.0f, -7.5f),
+			vec3(1.3f, -2.0f, -2.5f),
+			vec3(1.5f, 2.0f, -2.5f),
+			vec3(1.5f, 0.2f, -1.5f),
+			vec3(-1.3f, 1.0f, -1.5f)
 		};
 
 		float lastTime = 0.0f;
@@ -93,20 +94,20 @@ int main()
 			g_camera.send(shader);
 			lightManager.send(shader);
 
-			glm::mat4 model;
+			mat4 model;
 			for(unsigned int i = 0; i < cubePositions.size(); i++)
 			{
-				model = glm::mat4(1.0f);
-				model = glm::translate(model, cubePositions[i]);
+				model = mat4(1.0f);
+				model = translate(model, cubePositions[i]);
 				float angle = 20.0f * i;
-				model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-				model = glm::scale(model, glm::vec3(0.2f));
+				model = rotate(model, radians(angle), vec3(1.0f, 0.3f, 0.5f));
+				model = scale(model, vec3(0.2f));
 				shader.setMat4("model", model);
 				models[0].draw(shader);
 			}
-			model = glm::mat4(1.0f);
-			model = glm::translate(model, glm::vec3(0.0f, -1.5f, 0.0f));
-			model = glm::scale(model, glm::vec3(10.0f));
+			model = mat4(1.0f);
+			model = translate(model, vec3(0.0f, -1.5f, 0.0f));
+			model = scale(model, vec3(10.0f));
 			shader.setMat4("model", model);
 			models[1].draw(shader);
 

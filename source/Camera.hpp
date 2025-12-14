@@ -1,32 +1,29 @@
 #pragma once
 #include <glm/glm.hpp>
-
 #include "Shader.hpp"
+
+using namespace glm;
 
 class Camera
 {
 public:
-	glm::vec3 speed{0.0f, 0.0f, 0.0f};
+	vec3 speed{0.0f, 0.0f, 0.0f};
 
-	void setAspect(int width, int height);
+	void setAspect(float width, float height);
 
 	void mouse(float xoffset, float yoffset);
 	void update(float deltaTime);
 
 	void send(const Shader& shader);
 
-	glm::vec3 getPosition() { return eye; }
-	glm::vec3 getDirection() { return glm::normalize(target - eye); }
-
 private:
-	glm::mat4 getView() const;
-	glm::mat4 getProj() const;
-	glm::vec3 getPosition() const { return eye; }
+	mat4 getView() const;
+	mat4 getProj() const;
 
 	// motion
-	glm::vec3 eye{0.0f, 0.0f, 3.0f};
-	glm::vec3 target{0.0f, 0.0f, 0.0f};
-	glm::vec3 up{0.0f, 1.0f, 0.0f};
+	vec3 eye{0.0f, 0.0f, 3.0f};
+	vec3 target{0.0f, 0.0f, 0.0f};
+	vec3 up{0.0f, 1.0f, 0.0f};
 
 	// render
 	float aspect{800.0f / 600.0f};

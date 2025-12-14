@@ -101,10 +101,10 @@ void main()
     result += CalcDirLight(dirLight, norm, viewDir);
 
     for (int i = 0; i < NR_POINT_LIGHTS; i++)
-        result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
+    result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
 
     for (int i = 0; i < NR_SPOT_LIGHTS; i++)
-        result += CalcSpotLight(spotLights[i], norm, FragPos, viewDir);
+    result += CalcSpotLight(spotLights[i], norm, FragPos, viewDir);
 
     // Gamma correction
     result = pow(result, vec3(1.0 / 2.2));
@@ -117,11 +117,11 @@ void main()
 vec3 GetDiffuseColor()
 {
     if (u_numDiffuseTextures <= 0)
-        return vec3(1.0);
+    return vec3(1.0);
 
     vec3 color = vec3(0.0);
     for (int i = 0; i < u_numDiffuseTextures; i++)
-        color += texture(u_diffuseTextures[i], TexCoord).rgb;
+    color += texture(u_diffuseTextures[i], TexCoord).rgb;
 
     return color / float(u_numDiffuseTextures);
 }
@@ -129,11 +129,11 @@ vec3 GetDiffuseColor()
 vec3 GetSpecularColor()
 {
     if (u_numSpecularTextures <= 0)
-        return vec3(0.0);
+    return vec3(0.0);
 
     vec3 color = vec3(0.0);
     for (int i = 0; i < u_numSpecularTextures; i++)
-        color += texture(u_specularTextures[i], TexCoord).rgb;
+    color += texture(u_specularTextures[i], TexCoord).rgb;
 
     return color / float(u_numSpecularTextures);
 }
@@ -169,10 +169,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     float spec = pow(max(dot(normal, halfwayDir), 0.0), shininess);
 
     float distance = length(light.position - fragPos);
-    float attenuation =
-        1.0 / (light.constant +
-               light.linear * distance +
-               light.quadratic * distance * distance);
+    float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * distance * distance);
 
     vec3 diffuseColor  = GetDiffuseColor();
     vec3 specularColor = GetSpecularColor();
@@ -195,9 +192,9 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
 
     float distance = length(light.position - fragPos);
     float attenuation =
-        1.0 / (light.constant +
-               light.linear * distance +
-               light.quadratic * distance * distance);
+    1.0 / (light.constant +
+    light.linear * distance +
+    light.quadratic * distance * distance);
 
     float theta = dot(lightDir, normalize(-light.direction));
     float epsilon = light.cutOff - light.outerCutOff;

@@ -5,46 +5,46 @@
 LightManager::LightManager()
 {
 	// Directional light from bottom
-	dirLight.direction = glm::vec3(0.0f, 1.0f, 0.0f);
-	dirLight.ambient = glm::vec3(0.1f, 0.1f, 0.1f);
-	dirLight.diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-	dirLight.specular = glm::vec3(1.0f, 1.0f, 1.0f);
+	dirLight.direction = vec3(0.0f, 1.0f, 0.0f);
+	dirLight.ambient = vec3(0.1f, 0.1f, 0.1f);
+	dirLight.diffuse = vec3(1.0f, 1.0f, 1.0f);
+	dirLight.specular = vec3(1.0f, 1.0f, 1.0f);
 
 	// Point light in corner
 	pointLights.resize(1);
-	pointLights[0].position = glm::vec3(5.0f, 1.0f, 5.0f);
-	pointLights[0].ambient = glm::vec3(0.3f, 0.3f, 0.3f);
-	pointLights[0].diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-	pointLights[0].specular = glm::vec3(1.0f, 1.0f, 1.0f);
+	pointLights[0].position = vec3(8.0f, 1.0f, 8.0f);
+	pointLights[0].ambient = vec3(0.3f, 0.3f, 0.3f);
+	pointLights[0].diffuse = vec3(1.0f, 1.0f, 1.0f);
+	pointLights[0].specular = vec3(1.0f, 1.0f, 1.0f);
 	pointLights[0].constant = 1.0f;
 	pointLights[0].linear = 0.09f;
 	pointLights[0].quadratic = 0.032f;
 
 	// Spotlights around center, pointing to floor center
 	spotLights.resize(3);
-	constexpr glm::vec3 center = glm::vec3(0.0f, -1.0f, 0.0f); // Floor center
-	constexpr glm::vec3 spotPositions[] = {
-		glm::vec3(5.0f, 2.0f, 5.0f),
-		glm::vec3(-5.0f, 2.0f, 5.0f),
-		glm::vec3(0.0f, 2.0f, -5.0f)
+	constexpr auto center = vec3(0.0f, -1.0f, 0.0f); // Floor center
+	constexpr vec3 spotPositions[] = {
+		vec3(5.0f, 2.0f, 5.0f),
+		vec3(-5.0f, 2.0f, 5.0f),
+		vec3(0.0f, 2.0f, -5.0f)
 	};
-	constexpr glm::vec3 spotColors[] = {
-		glm::vec3(1.0f, 0.0f, 0.0f), // Red
-		glm::vec3(0.0f, 1.0f, 0.0f), // Green
-		glm::vec3(0.0f, 0.0f, 1.0f) // Blue
+	constexpr vec3 spotColors[] = {
+		vec3(1.0f, 0.0f, 0.0f), // Red
+		vec3(0.0f, 1.0f, 0.0f), // Green
+		vec3(0.0f, 0.0f, 1.0f) // Blue
 	};
 	for(int i = 0; i < 3; ++i)
 	{
 		spotLights[i].position = spotPositions[i];
-		spotLights[i].direction = glm::normalize(center - spotPositions[i]);
+		spotLights[i].direction = normalize(center - spotPositions[i]);
 		spotLights[i].ambient = spotColors[i] * 0.1f;
 		spotLights[i].diffuse = spotColors[i];
 		spotLights[i].specular = spotColors[i];
 		spotLights[i].constant = 1.0f;
 		spotLights[i].linear = 0.09f;
 		spotLights[i].quadratic = 0.032f;
-		spotLights[i].cutOff = glm::cos(glm::radians(12.5f));
-		spotLights[i].outerCutOff = glm::cos(glm::radians(15.0f));
+		spotLights[i].cutOff = cos(radians(12.5f));
+		spotLights[i].outerCutOff = cos(radians(15.0f));
 	}
 }
 

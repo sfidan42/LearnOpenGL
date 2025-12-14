@@ -2,19 +2,19 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/constants.hpp>
 
-glm::mat4 Camera::getView() const
+mat4 Camera::getView() const
 {
-	return glm::lookAt(eye, target, up);
+	return lookAt(eye, target, up);
 }
 
-glm::mat4 Camera::getProj() const
+mat4 Camera::getProj() const
 {
-	return glm::perspective(glm::radians(fov), aspect, zNear, zFar);
+	return perspective(radians(fov), aspect, zNear, zFar);
 }
 
-void Camera::setAspect(int width, int height)
+void Camera::setAspect(float width, float height)
 {
-	aspect = static_cast<float>(width) / static_cast<float>(height);
+	aspect = width / height;
 }
 
 void Camera::mouse(float xoffset, float yoffset)
@@ -24,15 +24,15 @@ void Camera::mouse(float xoffset, float yoffset)
 	pitch = glm::clamp(pitch, -89.99f, 89.99f);
 }
 
-void Camera::update(float deltaTime)
+void Camera::update(const float deltaTime)
 {
-	const glm::vec3 front = glm::normalize(glm::vec3(
-		cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
-		sin(glm::radians(pitch)),
-		sin(glm::radians(yaw)) * cos(glm::radians(pitch))
+	const vec3 front = normalize(vec3(
+		cos(radians(yaw)) * cos(radians(pitch)),
+		sin(radians(pitch)),
+		sin(radians(yaw)) * cos(radians(pitch))
 	));
 
-	const glm::vec3 right = glm::normalize(glm::cross(front, up));
+	const vec3 right = normalize(cross(front, up));
 
 	eye += right * speed.x * deltaTime * 10.0f;
 	eye += up * speed.y * deltaTime * 10.0f;
@@ -40,10 +40,11 @@ void Camera::update(float deltaTime)
 
 	target = eye + front;
 }
+
 void Camera::send(const Shader& shader)
 {
-	glm::mat4 proj = getProj();
-	glm::mat4 view = getView();
+	mat4 proj = getProj();
+	mat4 view = getView();
 	shader.setMat4("projection", proj);
 	shader.setMat4("view", view);
 	shader.setVec3("viewPos", eye);

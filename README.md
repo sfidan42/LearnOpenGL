@@ -26,3 +26,5 @@ To build and run the code, follow these steps:
 5. Screenshots of the project:
    1. After finishing "Lighting" section of the book:
     ![multiple lights](assets/multiple_lights.png)
+   2. After finishing "Model Loading" section of the book:
+    ![model loading](assets/assimp_and_lights.png)

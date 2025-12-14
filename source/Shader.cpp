@@ -4,10 +4,10 @@
 #include <iostream>
 #include <sstream>
 
-bool Shader::loadShaders(const std::vector<std::string>& filepaths)
+bool Shader::loadShaders(const vector<string>& filepaths)
 {
 	config(filepaths.size());
-	for(const std::string& filepath : filepaths)
+	for(const string& filepath : filepaths)
 		read(filepath);
 	return create();
 }
@@ -18,33 +18,33 @@ void Shader::config(const unsigned int count)
 	shaders.reserve(count);
 }
 
-void Shader::read(const std::string& filepath)
+void Shader::read(const string& filepath)
 {
-	std::string data_dir = DATA_DIR;
-	std::string full_path = data_dir + "/" + filepath;
+	string data_dir = DATA_DIR;
+	string full_path = data_dir + "/" + filepath;
 
-	std::string line;
-	std::ifstream file(full_path);
-	std::stringstream ss[2];
+	string line;
+	ifstream file(full_path);
+	stringstream ss[2];
 
 	if(!file.is_open())
 	{
-		std::cerr << "Failed to open file: " << full_path << "\n";
+		cerr << "Failed to open file: " << full_path << "\n";
 		return;
 	}
 	if(shaders.size() >= shaders.capacity())
 	{
-		std::cerr << "Shader count exceeded\n";
+		cerr << "Shader count exceeded\n";
 		return;
 	}
 	int i = -1;
 	while(getline(file, line))
 	{
-		if(line.find("#shader") != std::string::npos)
+		if(line.find("#shader") != string::npos)
 		{
-			if(line.find("vertex") != std::string::npos)
+			if(line.find("vertex") != string::npos)
 				i = 0;
-			else if(line.find("fragment") != std::string::npos)
+			else if(line.find("fragment") != string::npos)
 				i = 1;
 		}
 		else if(i != -1)
@@ -64,8 +64,8 @@ static bool compile(GLuint shader, const char* shader_source)
 	if(!success)
 	{
 		glGetShaderInfoLog(shader, 512, nullptr, infoLog);
-		std::cerr << "shader compilation failed\n" << infoLog << std::endl;
-		std::cerr << shader_source << std::endl;
+		cerr << "shader compilation failed\n" << infoLog << endl;
+		cerr << shader_source << endl;
 		return false;
 	}
 	return true;
@@ -81,38 +81,38 @@ void Shader::use(const unsigned int index)
 {
 	if(index >= programs.size())
 	{
-		std::cerr << "Invalid program index: " << index << std::endl;
+		cerr << "Invalid program index: " << index << endl;
 		return;
 	}
 	program = programs[index];
 	GL_CHECK(glUseProgram(program));
 }
 
-void Shader::setMat4(const std::string& name, const glm::mat4& matrix) const
+void Shader::setMat4(const string& name, const mat4& matrix) const
 {
 	const GLint loc = glGetUniformLocation(program, name.c_str());
 	GL_CHECK(glUniformMatrix4fv(loc, 1, GL_FALSE, &matrix[0][0]));
 }
 
-void Shader::setVec3(const std::string& name, const glm::vec3& vec) const
+void Shader::setVec3(const string& name, const vec3& vec) const
 {
 	const GLint loc = glGetUniformLocation(program, name.c_str());
 	GL_CHECK(glUniform3fv(loc, 1, &vec[0]));
 }
 
-void Shader::setFloat(const std::string& name, const float value) const
+void Shader::setFloat(const string& name, const float value) const
 {
 	const GLint loc = glGetUniformLocation(program, name.c_str());
 	GL_CHECK(glUniform1f(loc, value));
 }
 
-void Shader::setInt(const std::string& name, const int value) const
+void Shader::setInt(const string& name, const int value) const
 {
 	const GLint loc = glGetUniformLocation(program, name.c_str());
 	GL_CHECK(glUniform1i(loc, value));
 }
 
-void Shader::setBool(const std::string& name, const int value) const
+void Shader::setBool(const string& name, const int value) const
 {
 	const GLint loc = glGetUniformLocation(program, name.c_str());
 	GL_CHECK(glUniform1i(loc, value));
@@ -130,19 +130,19 @@ bool Shader::create()
 		const GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 		if(vertexShader == 0)
 		{
-			std::cerr << "Failed to create vertex shader" << std::endl;
+			cerr << "Failed to create vertex shader" << endl;
 			return false;
 		}
 		const GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 		if(fragmentShader == 0)
 		{
-			std::cerr << "Failed to create fragment shader" << std::endl;
+			cerr << "Failed to create fragment shader" << endl;
 			return false;
 		}
 		GLuint shaderProgram = glCreateProgram();
 		if(shaderProgram == 0)
 		{
-			std::cerr << "Failed to create shader program" << std::endl;
+			cerr << "Failed to create shader program" << endl;
 			return false;
 		}
 
@@ -155,7 +155,7 @@ bool Shader::create()
 		if(!success)
 		{
 			glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
-			std::cerr << "Shader program linking failed\n" << infoLog << std::endl;
+			cerr << "Shader program linking failed\n" << infoLog << endl;
 			return false;
 		}
 		glDeleteShader(vertexShader);
