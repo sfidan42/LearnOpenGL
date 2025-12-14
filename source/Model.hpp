@@ -32,7 +32,7 @@ public:
 	void draw(const Shader& shader) const;
 
 private:
-	vector<Texture> textures_loaded;
+	//vector<Texture> textures_loaded;
 	//vector<Mesh> meshes;
 	string directory;
 
@@ -41,7 +41,7 @@ private:
 	void loadModel(const string& modelPath);
 	void processNode(aiNode* node, const aiScene* scene);
 	void processMesh(aiMesh* mesh, const aiScene* scene);
-	vector<Texture> loadMaterialTextures(aiMaterial* mat, aiTextureType type,
+	vector<TextureComponent> loadMaterialTextures(aiMaterial* mat, aiTextureType type,
 										 const string& typeName, const aiScene* scene);
 
 };

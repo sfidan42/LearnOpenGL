@@ -56,7 +56,7 @@ unsigned int TextureFromFile(const char* path, const string& directory)
 	}
 	else
 	{
-		cout << "Texture failed to load at path: " << path << endl;
+		cout << "TextureComponent failed to load at path: " << path << endl;
 		stbi_image_free(data);
 	}
 
@@ -68,9 +68,10 @@ Model::Model(const string& modelPath)
 	cout << "------------------Model-------------------" << endl;
 	loadModel(modelPath);
 	cout << "Number of meshes: " << registry.view<MeshComponent>().storage()->size() << endl;
-	cout << "Number of textures loaded: " << textures_loaded.size() << endl;
-	for(auto& [id, type, path] : textures_loaded)
-		cout << "\tTexture ID: " << id << ", Type: " << type << ", Path: " << path << endl;
+	auto texturesView = registry.view<TextureComponent>();
+	cout << "Number of textures loaded: " << texturesView.storage()->size() << endl;
+	for(auto [ent, tex] : texturesView.each())
+		cout << "\tTextureComponent ID: " << tex.id << ", Type: " << tex.type << ", Path: " << tex.path << endl;
 	cout << "----------------------------------------" << endl;
 }
 
@@ -82,7 +83,7 @@ Model::~Model()
 void Model::draw(const Shader& shader) const
 {
 	const auto view = registry.view<MeshComponent>();
-	view.each([shader](const MeshComponent& mesh){ mesh.draw(shader); });
+	view.each([shader](const MeshComponent& mesh) { mesh.draw(shader); });
 }
 
 void Model::loadModel(const string& modelPath)
@@ -128,7 +129,7 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene)
 	// data to fill
 	vector<Vertex> vertices;
 	vector<unsigned int> indices;
-	vector<Texture> textures;
+	vector<TextureComponent> textures;
 
 	// walk through each of the mesh's vertices
 	for(unsigned int i = 0; i < mesh->mNumVertices; i++)
@@ -182,10 +183,10 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene)
 	// normal: texture_normalN
 
 	// 1. diffuse maps
-	vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "diffuse", scene);
+	vector<TextureComponent> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "diffuse", scene);
 	textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
 	// 2. specular maps
-	vector<Texture> specularMaps =
+	vector<TextureComponent> specularMaps =
 		loadMaterialTextures(material, aiTextureType_SPECULAR, "specular", scene);
 	textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
@@ -195,30 +196,31 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene)
 	meshComp.setup(vertices, indices, textures);
 }
 
-vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type, const string& typeName,
-											const aiScene* scene)
+vector<TextureComponent> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type, const string& typeName,
+													 const aiScene* scene)
 {
-	vector<Texture> textures;
+	vector<TextureComponent> textures;
 	for(unsigned int i = 0; i < mat->GetTextureCount(type); i++)
 	{
 		aiString str;
 		mat->GetTexture(type, i, &str);
-		// check if texture was loaded before and if so, continue to next iteration: skip loading a new texture
+		// check if TextureComponent was loaded before and if so, continue to next iteration: skip loading a new TextureComponent
 		bool skip = false;
-		for(auto& j : textures_loaded)
+		auto view = registry.view<TextureComponent>();
+		for(auto [ent, tex] : view.each())
 		{
-			if(strcmp(j.path.data(), str.C_Str()) == 0)
+			if(strcmp(tex.path.data(), str.C_Str()) == 0)
 			{
-				textures.push_back(j);
+				textures.push_back(tex);
 				skip = true;
-				// a texture with the same filepath has already been loaded, continue to next one. (optimization)
+				// a TextureComponent with the same filepath has already been loaded, continue to next one. (optimization)
 				break;
 			}
 		}
 		if(!skip)
 		{
-			// if texture hasn't been loaded already, load it
-			Texture texture;
+			// if TextureComponent hasn't been loaded already, load it
+			TextureComponent texture;
 
 			const char* texPath = str.C_Str();
 			// Handle embedded textures in glTF/GLB: paths like "*0"
@@ -282,7 +284,7 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type,
 					texture.type = typeName;
 					texture.path = texPath;
 					textures.push_back(texture);
-					textures_loaded.push_back(texture);
+					registry.emplace<TextureComponent>(registry.create(), texture);
 					continue; // processed embedded texture, go to next
 				}
 				cout << "Embedded texture index out of range: " << texPath << endl;
@@ -293,7 +295,7 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type,
 			texture.type = typeName;
 			texture.path = str.C_Str();
 			textures.push_back(texture);
-			textures_loaded.push_back(texture);
+			registry.emplace<TextureComponent>(registry.create(), texture);
 			// store it as texture loaded for entire model, to ensure we won't unnecessary load duplicate textures.
 		}
 	}
@@ -301,15 +303,15 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type,
 }
 
 Model::Model(Model&& other) noexcept
-    : textures_loaded(std::move(other.textures_loaded)),
-      directory(std::move(other.directory)),
-      registry(std::move(other.registry)) {}
+: directory(std::move(other.directory)),
+  registry(std::move(other.registry)) {}
 
-Model& Model::operator=(Model&& other) noexcept {
-    if (this != &other) {
-        textures_loaded = std::move(other.textures_loaded);
-        directory = std::move(other.directory);
-        registry = std::move(other.registry);
-    }
-    return *this;
+Model& Model::operator=(Model&& other) noexcept
+{
+	if(this != &other)
+	{
+		directory = std::move(other.directory);
+		registry = std::move(other.registry);
+	}
+	return *this;
 }

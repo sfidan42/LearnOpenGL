@@ -1,7 +1,7 @@
 #include "Ecs.hpp"
 
 void MeshComponent::setup(const vector<Vertex>& vertices, const vector<Index>& indices,
-							  const vector<Texture>& textures)
+							  const vector<TextureComponent>& textures)
 {
 	this->vertices = vertices;
 	this->indices = indices;
