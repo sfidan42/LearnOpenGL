@@ -1,5 +1,13 @@
 #include "Renderer.hpp"
 
+#include <glm/ext/quaternion_trigonometric.hpp>
+#include <glm/detail/type_quat.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include "Light.hpp"
+#include "callbacks.hpp"
+#include <stb_image.h>
+#include <iostream>
+
 Renderer::~Renderer()
 {
 	// destroy shader first, because it may use OpenGL context
@@ -58,28 +66,6 @@ void Renderer::run()
 
 	LightManager lightManager;
 
-	const string path(DATA_DIR);
-	const vector modelPaths = {
-		"/models/backpack/backpack.obj",
-		"/models/interior_tiles_1k.glb",
-	};
-	vector<Model> models;
-	for(const auto& modelPath : modelPaths)
-		models.emplace_back(path + modelPath);
-
-	const vector cubePositions = {
-		vec3(0.0f, 0.0f, 0.0f),
-		vec3(2.0f, 5.0f, -15.0f),
-		vec3(-1.5f, -2.2f, -2.5f),
-		vec3(-3.8f, -2.0f, -12.3f),
-		vec3(2.4f, -0.4f, -3.5f),
-		vec3(-1.7f, 3.0f, -7.5f),
-		vec3(1.3f, -2.0f, -2.5f),
-		vec3(1.5f, 2.0f, -2.5f),
-		vec3(1.5f, 0.2f, -1.5f),
-		vec3(-1.3f, 1.0f, -1.5f)
-	};
-
 	float lastTime = 0.0f;
 
 	while(!glfwWindowShouldClose(window))
@@ -97,24 +83,33 @@ void Renderer::run()
 		g_camera.send(*shader);
 		lightManager.send(*shader);
 
-		mat4 model;
-		for(unsigned int i = 0; i < cubePositions.size(); i++)
+		auto modelView = modelRegistry.view<Model, vector<TransformComponent>>();
+		for (auto entity : modelView)
 		{
-			model = mat4(1.0f);
-			model = translate(model, cubePositions[i]);
-			float angle = 20.0f * i;
-			model = rotate(model, radians(angle), vec3(1.0f, 0.3f, 0.5f));
-			model = scale(model, vec3(0.2f));
-			shader->setMat4("model", model);
-			models[0].draw(*shader);
+			auto& modelComp = modelView.get<Model>(entity);
+			auto& transforms = modelView.get<vector<TransformComponent>>(entity);
+			for (const auto& transform : transforms)
+			{
+				mat4 model = mat4(1.0f);
+				model = translate(model, transform.position);
+				model = rotate(model, radians(transform.rotation.x), vec3(1.0f, 0.0f, 0.0f));
+				model = rotate(model, radians(transform.rotation.y), vec3(0.0f, 1.0f, 0.0f));
+				model = rotate(model, radians(transform.rotation.z), vec3(0.0f, 0.0f, 1.0f));
+				model = scale(model, transform.scale);
+				shader->setMat4("model", model);
+				modelComp.draw(*shader);
+			}
 		}
-		model = mat4(1.0f);
-		model = translate(model, vec3(0.0f, -1.5f, 0.0f));
-		model = scale(model, vec3(10.0f));
-		shader->setMat4("model", model);
-		models[1].draw(*shader);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
+}
+
+void Renderer::loadModel(const string& modelPath, const vector<TransformComponent>& transforms)
+{
+	const string base(DATA_DIR);
+	const entt::entity model = modelRegistry.create();
+	modelRegistry.emplace<Model>(model, base + "/models/" + modelPath);
+	modelRegistry.emplace<vector<TransformComponent>>(model, transforms);
 }

@@ -25,6 +25,13 @@ struct Vertex
 
 using Index = uint32_t;
 
+struct TransformComponent
+{
+	vec3 position;
+	vec3 rotation;
+	vec3 scale;
+};
+
 struct TextureComponent
 {
 	GLuint id;
