@@ -28,3 +28,5 @@ To build and run the code, follow these steps:
     ![multiple lights](assets/multiple_lights.png)
    2. After finishing "Model Loading" section of the book:
     ![model loading](assets/assimp_and_lights.png)
+   3. Proper model loading using ECS architecture:
+    ![ecs model loading](assets/renderer_loadModel.png)

@@ -11,9 +11,9 @@
 Renderer::~Renderer()
 {
 	// destroy shader first, because it may use OpenGL context
-	if (shader)
+	if(shader)
 		delete shader;
-	if (window)
+	if(window)
 		glfwDestroyWindow(window);
 	glfwTerminate();
 }
@@ -83,33 +83,59 @@ void Renderer::run()
 		g_camera.send(*shader);
 		lightManager.send(*shader);
 
-		auto modelView = modelRegistry.view<Model, vector<TransformComponent>>();
-		for (auto entity : modelView)
-		{
-			auto& modelComp = modelView.get<Model>(entity);
-			auto& transforms = modelView.get<vector<TransformComponent>>(entity);
-			for (const auto& transform : transforms)
-			{
-				mat4 model = mat4(1.0f);
-				model = translate(model, transform.position);
-				model = rotate(model, radians(transform.rotation.x), vec3(1.0f, 0.0f, 0.0f));
-				model = rotate(model, radians(transform.rotation.y), vec3(0.0f, 1.0f, 0.0f));
-				model = rotate(model, radians(transform.rotation.z), vec3(0.0f, 0.0f, 1.0f));
-				model = scale(model, transform.scale);
-				shader->setMat4("model", model);
-				modelComp.draw(*shader);
-			}
-		}
+		auto view = modelRegistry.view<InstanceComponent, TransformComponent>();
 
+		for(auto e : view)
+		{
+			auto& [modelEntity]  = view.get<InstanceComponent>(e);
+			auto& [positionVec, rotationVec, scaleVec] = view.get<TransformComponent>(e);
+			auto& [path, model] = modelRegistry.get<ModelComponent>(modelEntity);
+
+			mat4 modelMat(1.0f);
+			modelMat = translate(modelMat, positionVec);
+			modelMat = rotate(modelMat, rotationVec.x, {1,0,0});
+			modelMat = rotate(modelMat, rotationVec.y, {0,1,0});
+			modelMat = rotate(modelMat, rotationVec.z, {0,0,1});
+			modelMat = scale(modelMat, scaleVec);
+
+			shader->setMat4("model", modelMat);
+			model.draw(*shader);
+		}
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 }
 
-void Renderer::loadModel(const string& modelPath, const vector<TransformComponent>& transforms)
+void Renderer::loadModel(const std::string& modelPath, const TransformComponent& transform)
 {
-	const string base(DATA_DIR);
-	const entt::entity model = modelRegistry.create();
-	modelRegistry.emplace<Model>(model, base + "/models/" + modelPath);
-	modelRegistry.emplace<vector<TransformComponent>>(model, transforms);
+	entt::entity modelEntity = entt::null;
+
+	// 1. Find or create the model resource entity
+	auto modelView = modelRegistry.view<ModelComponent>();
+	for(auto e : modelView)
+	{
+		if(modelView.get<ModelComponent>(e).path == modelPath)
+		{
+			modelEntity = e;
+			break;
+		}
+	}
+
+	if(modelEntity == entt::null)
+	{
+		const std::string base(DATA_DIR);
+		const std::string fullPath = base + "/models/" + modelPath;
+
+		modelEntity = modelRegistry.create();
+		modelRegistry.emplace<ModelComponent>(
+			modelEntity,
+			modelPath,
+			Model(fullPath)
+		);
+	}
+
+	// 2. Create an instance entity
+	const entt::entity instance = modelRegistry.create();
+	modelRegistry.emplace<InstanceComponent>(instance, modelEntity);
+	modelRegistry.emplace<TransformComponent>(instance, transform);
 }

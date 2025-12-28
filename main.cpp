@@ -15,11 +15,6 @@ int main()
 		return -1;
 	}
 
-	const vector modelPaths = {
-		"backpack/backpack.obj",
-		"interior_tiles_1k.glb",
-	};
-
 	const vector backpackPositions = {
 		vec3(0.0f, 0.0f, 0.0f),
 		vec3(2.0f, 5.0f, -15.0f),
@@ -48,8 +43,11 @@ int main()
 		TransformComponent{vec3(0.0f, -1.5f, 0.0f), vec3(0.0f), vec3(10.0f)}
 	};
 
-	renderer.loadModel(modelPaths[0], backpackTransforms);
-	renderer.loadModel(modelPaths[1], tilesTransforms);
+	for (const TransformComponent& transform : backpackTransforms)
+		renderer.loadModel("backpack/backpack.obj", transform);
+
+	for (const TransformComponent& transform : tilesTransforms)
+		renderer.loadModel("interior_tiles_1k.glb", transform);
 
 	renderer.run();
 

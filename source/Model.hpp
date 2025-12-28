@@ -1,16 +1,26 @@
 #pragma once
 #include <glad/glad.h>
-#include <glm/glm.hpp>
 #include <assimp/scene.h>
 #include <string>
 #include <vector>
-#include "Components.hpp"
 #include "Shader.hpp"
 #include <iostream>
+#include "Primitives.hpp"
 #include <entt/entity/registry.hpp>
 
-using namespace std;
-using namespace glm;
+struct TextureComponent;
+
+class Mesh
+{
+public:
+	void setup(const vector<Vertex>& vertices, const vector<Index>& indices, const vector<TextureComponent>& textures);
+	void draw(const Shader& shader) const;
+private:
+	vector<Vertex> vertices;
+	vector<Index> indices;
+	vector<TextureComponent> textures;
+	GLuint VAO{}, VBO{}, EBO{};
+};
 
 bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID);
 unsigned int TextureFromFile(const char* path, const string& directory);
@@ -19,7 +29,7 @@ class Model
 {
 public:
 	explicit Model(const string& modelPath);
-	~Model();
+	~Model() = default;
 
 	// Delete copy constructor and copy assignment operator
 	Model(const Model&) = delete;
