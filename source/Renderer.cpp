@@ -1,12 +1,12 @@
 #include "Renderer.hpp"
-
 #include <glm/ext/quaternion_trigonometric.hpp>
 #include <glm/detail/type_quat.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include "Light.hpp"
 #include "callbacks.hpp"
 #include <stb_image.h>
 #include <iostream>
+#include <algorithm>
+#include "Light.hpp"
 
 Renderer::~Renderer()
 {
@@ -45,10 +45,13 @@ bool Renderer::init(const vector<string>& shaderFilepaths)
 		return false;
 	}
 
-	stbi_set_flip_vertically_on_load(true);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glEnable(GL_DEPTH_TEST);
 	glViewport(0, 0, 1200, 720);
+
+	stbi_set_flip_vertically_on_load(true);
 
 	shader = new Shader();
 	if(!shader->loadShaders(shaderFilepaths))
@@ -83,31 +86,69 @@ void Renderer::run()
 		g_camera.send(*shader);
 		lightManager.send(*shader);
 
-		auto view = modelRegistry.view<InstanceComponent, TransformComponent>();
-
-		for(auto e : view)
+		auto opaqueView = modelRegistry.view<InstanceComponent, TransformComponent>(
+			entt::exclude<TransparencyComponent>);
+		glDepthMask(GL_TRUE);
+		for(auto e : opaqueView)
 		{
-			auto& [modelEntity]  = view.get<InstanceComponent>(e);
-			auto& [positionVec, rotationVec, scaleVec] = view.get<TransformComponent>(e);
+			auto& [modelEntity] = opaqueView.get<InstanceComponent>(e);
+			auto& [positionVec, rotationVec, scaleVec] = opaqueView.get<TransformComponent>(e);
 			auto& [path, model] = modelRegistry.get<ModelComponent>(modelEntity);
 
 			mat4 modelMat(1.0f);
 			modelMat = translate(modelMat, positionVec);
-			modelMat = rotate(modelMat, rotationVec.x, {1,0,0});
-			modelMat = rotate(modelMat, rotationVec.y, {0,1,0});
-			modelMat = rotate(modelMat, rotationVec.z, {0,0,1});
+			modelMat = rotate(modelMat, rotationVec.x, {1, 0, 0});
+			modelMat = rotate(modelMat, rotationVec.y, {0, 1, 0});
+			modelMat = rotate(modelMat, rotationVec.z, {0, 0, 1});
 			modelMat = scale(modelMat, scaleVec);
 
+			shader->setFloat("u_Alpha", 1.0f);
 			shader->setMat4("model", modelMat);
 			model.draw(*shader);
 		}
+		auto transparentView = modelRegistry.view<InstanceComponent, TransformComponent, TransparencyComponent>();
+		std::vector<entt::entity> sorted;
+		for(auto e : transparentView)
+			sorted.push_back(e);
+		// sort back-to-front
+		ranges::sort(sorted,
+					 [&](const entt::entity a, const entt::entity b)
+					 {
+						 const auto& ta = modelRegistry.get<TransformComponent>(a);
+						 const auto& tb = modelRegistry.get<TransformComponent>(b);
+
+						 return length(g_camera.position() - ta.position) >
+							 length(g_camera.position() - tb.position);
+					 });
+		glDepthMask(GL_FALSE);
+		for (auto e : sorted)
+		{
+			auto& [modelEntity] = transparentView.get<InstanceComponent>(e);
+			auto& [positionVec, rotationVec, scaleVec] = transparentView.get<TransformComponent>(e);
+			auto& [alpha] = transparentView.get<TransparencyComponent>(e);
+			auto& [path, model] = modelRegistry.get<ModelComponent>(modelEntity);
+
+			mat4 modelMat(1.0f);
+			modelMat = translate(modelMat, positionVec);
+			modelMat = rotate(modelMat, rotationVec.x, {1, 0, 0});
+			modelMat = rotate(modelMat, rotationVec.y, {0, 1, 0});
+			modelMat = rotate(modelMat, rotationVec.z, {0, 0, 1});
+			modelMat = scale(modelMat, scaleVec);
+
+			shader->setFloat("u_Alpha", alpha);
+			shader->setMat4("model", modelMat);
+			model.draw(*shader);
+		}
+		glDepthMask(GL_TRUE);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 }
 
-void Renderer::loadModel(const std::string& modelPath, const TransformComponent& transform)
+void Renderer::loadModel(const std::string& modelPath, const TransformComponent& transform, float blendAlpha)
 {
+	assert(0.0f <= blendAlpha && blendAlpha <= 1.0f && "blendAlpha must be in [0.0, 1.0]");
+
 	entt::entity modelEntity = entt::null;
 
 	// 1. Find or create the model resource entity
@@ -138,4 +179,6 @@ void Renderer::loadModel(const std::string& modelPath, const TransformComponent&
 	const entt::entity instance = modelRegistry.create();
 	modelRegistry.emplace<InstanceComponent>(instance, modelEntity);
 	modelRegistry.emplace<TransformComponent>(instance, transform);
+	if(blendAlpha < 1.0f)
+		modelRegistry.emplace<TransparencyComponent>(instance, blendAlpha);
 }

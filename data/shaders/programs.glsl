@@ -40,14 +40,16 @@ uniform int u_numSpecularTextures;
 float shininess = 32;
 
 // ================= LIGHTS =================
-struct DirLight {
+struct DirLight
+{
     vec3 direction;
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
 };
 
-struct PointLight {
+struct PointLight
+{
     vec3 position;
     float constant;
     float linear;
@@ -58,7 +60,8 @@ struct PointLight {
     vec3 specular;
 };
 
-struct SpotLight {
+struct SpotLight
+{
     vec3 position;
     vec3 direction;
 
@@ -81,9 +84,10 @@ uniform DirLight dirLight;
 uniform PointLight pointLights[NR_POINT_LIGHTS];
 uniform SpotLight spotLights[NR_SPOT_LIGHTS];
 uniform vec3 viewPos;
+uniform float u_Alpha;
 
 // ================= FUNCTION PROTOTYPES =================
-vec3 GetDiffuseColor();
+vec4 GetDiffuseColor();
 vec3 GetSpecularColor();
 
 vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir);
@@ -109,19 +113,23 @@ void main()
     // Gamma correction
     result = pow(result, vec3(1.0 / 2.2));
 
-    FragColor = vec4(result, 1.0);
+    float textureAlpha = GetDiffuseColor().a;
+    float finalAlpha = textureAlpha * u_Alpha;
+    if (finalAlpha < 0.01)
+        discard;
+    FragColor = vec4(result, finalAlpha);
 }
 
 // ================= MATERIAL HELPERS =================
 
-vec3 GetDiffuseColor()
+vec4 GetDiffuseColor()
 {
     if (u_numDiffuseTextures <= 0)
-    return vec3(1.0);
+    return vec4(1.0);
 
-    vec3 color = vec3(0.0);
+    vec4 color = vec4(0.0);
     for (int i = 0; i < u_numDiffuseTextures; i++)
-    color += texture(u_diffuseTextures[i], TexCoord).rgb;
+    color += texture(u_diffuseTextures[i], TexCoord);
 
     return color / float(u_numDiffuseTextures);
 }
@@ -149,7 +157,7 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir)
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
 
-    vec3 diffuseColor  = GetDiffuseColor();
+    vec3 diffuseColor  = GetDiffuseColor().rgb;
     vec3 specularColor = GetSpecularColor();
 
     vec3 ambient  = light.ambient  * diffuseColor;
@@ -171,7 +179,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     float distance = length(light.position - fragPos);
     float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * distance * distance);
 
-    vec3 diffuseColor  = GetDiffuseColor();
+    vec3 diffuseColor  = GetDiffuseColor().rgb;
     vec3 specularColor = GetSpecularColor();
 
     vec3 ambient  = light.ambient  * diffuseColor;
@@ -200,7 +208,7 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     float epsilon = light.cutOff - light.outerCutOff;
     float intensity = clamp((theta - light.outerCutOff) / epsilon, 0.0, 1.0);
 
-    vec3 diffuseColor  = GetDiffuseColor();
+    vec3 diffuseColor  = GetDiffuseColor().rgb;
     vec3 specularColor = GetSpecularColor();
 
     vec3 ambient  = light.ambient  * diffuseColor;

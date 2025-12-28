@@ -13,6 +13,11 @@ struct TransformComponent
 	vec3 scale;
 };
 
+struct TransparencyComponent
+{
+	float alpha;
+};
+
 struct TextureComponent
 {
 	GLuint id;

@@ -43,8 +43,13 @@ int main()
 		TransformComponent{vec3(0.0f, -1.5f, 0.0f), vec3(0.0f), vec3(10.0f)}
 	};
 
+	float alphaStep = 1.0f / static_cast<float>(backpackTransforms.size());
+	float blendAlpha = 0.0f;
 	for (const TransformComponent& transform : backpackTransforms)
-		renderer.loadModel("backpack/backpack.obj", transform);
+	{
+		renderer.loadModel("backpack/backpack.obj", transform, blendAlpha);
+		blendAlpha += alphaStep;
+	}
 
 	for (const TransformComponent& transform : tilesTransforms)
 		renderer.loadModel("interior_tiles_1k.glb", transform);
