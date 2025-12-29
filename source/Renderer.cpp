@@ -81,7 +81,7 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 
 	const string skyboxDir = string(DATA_DIR) + "/textures/skybox";
 	skybox->loadFaces(skyboxDir, faces);
-	skybox->scale(20.0f);
+	skybox->scale(1000.0f);
 
 	stbi_set_flip_vertically_on_load(true);
 
@@ -103,9 +103,10 @@ void Renderer::run()
 		const float deltaTime = currentTime - lastTime;
 		lastTime = currentTime;
 
+		lightManager.send(*mainShader, *skyboxShader);
+
 		g_camera.update(deltaTime);
-		g_camera.send(*mainShader);
-		lightManager.send(*mainShader);
+		g_camera.send(*mainShader, *skyboxShader);
 
 		auto renderView = modelRegistry.view<InstanceComponent, TransformComponent>();
 		glDepthMask(GL_TRUE);
@@ -127,15 +128,6 @@ void Renderer::run()
 			model.draw(*mainShader);
 		}
 
-		{
-			GLenum err;
-			while((err = glGetError()) != GL_NO_ERROR)
-			{
-				std::cerr << "Error detected AFTER render loop, BEFORE skybox: " << err << std::endl;
-			}
-		}
-
-		g_camera.send(*skyboxShader);
 		skybox->draw(*skyboxShader);
 
 		glfwSwapBuffers(window);
@@ -145,6 +137,7 @@ void Renderer::run()
 
 void Renderer::loadModel(const std::string& modelPath, const TransformComponent& transform)
 {
+	// TODO: some models need glCullFace(GL_FRONT), others GL_BACK or disabled culling
 	entt::entity modelEntity = entt::null;
 
 	// 1. Find or create the model resource entity

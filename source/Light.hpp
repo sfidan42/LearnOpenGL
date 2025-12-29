@@ -47,5 +47,5 @@ public:
 	std::vector<PointLight> pointLights;
 	std::vector<SpotLight> spotLights;
 
-	void send(const Shader& shader) const;
+	void send(const Shader& mainShader, const Shader& skyShader) const;
 };
