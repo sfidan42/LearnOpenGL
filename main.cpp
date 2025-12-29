@@ -7,11 +7,10 @@ int main()
 {
 	Renderer renderer;
 
-	vector<string> shader_filepaths = {
-		"shaders/programs.glsl",
-	};
+	const string mainShaderPath = "shaders/main.glsl";
+	const string skyboxShaderPath = "shaders/skybox.glsl";
 
-	if(!renderer.init(shader_filepaths))
+	if(!renderer.init(mainShaderPath, skyboxShaderPath))
 	{
 		cout << "Failed to initialize renderer" << endl;
 		return -1;

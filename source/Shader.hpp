@@ -13,8 +13,8 @@ public:
 	Shader() = default;
 	~Shader();
 
-	bool loadShaders(const vector<string>& filepaths);
-	void use(unsigned int index);
+	bool load(const string& filepath);
+	void use() const;
 
 	void setMat4(const string& name, const mat4& matrix) const;
 	void setVec3(const string& name, const vec3& vec) const;
@@ -23,17 +23,15 @@ public:
 	void setBool(const string& name, int value) const;
 
 private:
-	void config(GLuint count);
-	void read(const string& filepath);
-	bool create();
-
 	struct ShaderSource
 	{
 		string vertex;
 		string fragment;
 	};
 
+	ShaderSource read(const string& filepath);
+	static GLuint create(const ShaderSource& shaderCode);
+
 	GLuint program = -1;
-	vector<GLuint> programs;
-	vector<ShaderSource> shaders;
+	ShaderSource source;
 };

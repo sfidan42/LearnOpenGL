@@ -6,18 +6,18 @@
 #include <stb_image.h>
 #include <iostream>
 #include <algorithm>
-#include "Light.hpp"
 
 Renderer::~Renderer()
 {
-	// destroy shader first, because it may use OpenGL context
-	delete shader;
+	// destroy shaders first, because it may use OpenGL context
+	delete mainShader;
+	delete skyboxShader;
 	if(window)
 		glfwDestroyWindow(window);
 	glfwTerminate();
 }
 
-bool Renderer::init(const vector<string>& shaderFilepaths)
+bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath)
 {
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -50,10 +50,12 @@ bool Renderer::init(const vector<string>& shaderFilepaths)
 	glEnable(GL_DEPTH_TEST);
 	glViewport(0, 0, 1200, 720);
 
+	glEnable(GL_CULL_FACE);
+
 	stbi_set_flip_vertically_on_load(true);
 
-	shader = new Shader();
-	if(!shader->loadShaders(shaderFilepaths))
+	mainShader = new Shader();
+	if(!mainShader->load(mainShaderPath))
 	{
 		cout << "Failed to load shaders" << endl;
 		return false;
@@ -65,8 +67,6 @@ bool Renderer::init(const vector<string>& shaderFilepaths)
 void Renderer::run()
 {
 	assert(window != nullptr && "Window is not initialized");
-
-	LightManager lightManager;
 
 	float lastTime = 0.0f;
 
@@ -81,9 +81,9 @@ void Renderer::run()
 
 		g_camera.update(deltaTime);
 
-		shader->use(0);
-		g_camera.send(*shader);
-		lightManager.send(*shader);
+		mainShader->use();
+		g_camera.send(*mainShader);
+		lightManager.send(*mainShader);
 
 		auto renderView = modelRegistry.view<InstanceComponent, TransformComponent>();
 		glDepthMask(GL_TRUE);
@@ -100,9 +100,9 @@ void Renderer::run()
 			modelMat = rotate(modelMat, rotationVec.z, {0, 0, 1});
 			modelMat = scale(modelMat, scaleVec);
 
-			shader->setFloat("u_Alpha", 1.0f);
-			shader->setMat4("model", modelMat);
-			model.draw(*shader);
+			mainShader->use();
+			mainShader->setMat4("model", modelMat);
+			model.draw(*mainShader);
 		}
 
 		glDepthMask(GL_TRUE);
