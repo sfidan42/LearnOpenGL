@@ -37,7 +37,7 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
-	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 	{
@@ -53,8 +53,6 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	g_camera.setAspect(1200, 720);
 
 	glEnable(GL_CULL_FACE);
-
-	stbi_set_flip_vertically_on_load(true);
 
 	mainShader = new Shader();
 	if(!mainShader->load(mainShaderPath))
@@ -83,6 +81,9 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 
 	const string skyboxDir = string(DATA_DIR) + "/textures/skybox";
 	skybox->loadFaces(skyboxDir, faces);
+	skybox->scale(10.0f);
+
+	stbi_set_flip_vertically_on_load(true);
 
 	return true;
 }
@@ -124,6 +125,14 @@ void Renderer::run()
 			mainShader->use();
 			mainShader->setMat4("model", modelMat);
 			model.draw(*mainShader);
+		}
+
+		{
+			GLenum err;
+			while((err = glGetError()) != GL_NO_ERROR)
+			{
+				std::cerr << "Error detected AFTER render loop, BEFORE skybox: " << err << std::endl;
+			}
 		}
 
 		g_camera.send(*skyboxShader);

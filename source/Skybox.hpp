@@ -14,9 +14,11 @@ public:
 	~Skybox();
 
 	void loadFaces(const string& directory, const string facePaths[6]);
+	void scale(float scale);
 	void draw(const Shader& shader) const;
 private:
 	GLuint skyboxTextureID = 0;
+	float scaleFactor = 1.0f;
 	vector<float> skyboxVertices;
 	GLuint skyboxVAO = 0;
 	GLuint skyboxVBO = 0;

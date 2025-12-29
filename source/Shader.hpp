@@ -13,6 +13,11 @@ public:
 	Shader() = default;
 	~Shader();
 
+	// non-copyable, because of OpenGL resource management
+	// Otherwise Shader destructor could be called during copy, which would delete the program ID
+	Shader(const Shader&) = delete;
+	Shader& operator=(const Shader&) = delete;
+
 	bool load(const string& filepath);
 	void use() const;
 
@@ -21,6 +26,8 @@ public:
 	void setFloat(const string& name, float value) const;
 	void setInt(const string& name, int value) const;
 	void setBool(const string& name, int value) const;
+
+	GLuint program = -1;
 
 private:
 	struct ShaderSource
@@ -32,6 +39,5 @@ private:
 	ShaderSource read(const string& filepath);
 	static GLuint create(const ShaderSource& shaderCode);
 
-	GLuint program = -1;
 	ShaderSource source;
 };

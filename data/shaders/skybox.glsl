@@ -5,13 +5,14 @@ layout (location = 0) in vec3 aPos; // vertex position
 
 uniform mat4 projection; // projection matrix
 uniform mat4 view; // view matrix
+uniform float scaleFactor; // scale factor for skybox size
 
 out vec3 textureDir; // output direction vector for texture sampling
 
 void main()
 {
     textureDir = aPos; // use vertex position as direction vector
-    vec4 pos = projection * view * vec4(aPos, 1.0); // transform vertex position
+    vec4 pos = projection * view * vec4(aPos * scaleFactor, 1.0);
     gl_Position = pos.xyww; // set gl_Position with w component for depth correction
 }
 

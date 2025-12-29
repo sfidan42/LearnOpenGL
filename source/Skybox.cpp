@@ -115,11 +115,17 @@ void Skybox::loadFaces(const string& directory, const string facePaths[6])
 	skyboxTextureID = CubemapFromFile(directory, facePaths);
 }
 
+void Skybox::scale(float scale)
+{
+	scaleFactor = scale;
+}
+
 void Skybox::draw(const Shader& shader) const
 {
 	glDepthFunc(GL_LEQUAL);
 	shader.use();
 	shader.setInt("cubemap", 0);
+	shader.setFloat("scaleFactor", scaleFactor);
 	GL_CHECK(glBindVertexArray(skyboxVAO));
 	GL_CHECK(glActiveTexture(GL_TEXTURE0));
 	GL_CHECK(glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTextureID));

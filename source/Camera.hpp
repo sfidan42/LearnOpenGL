@@ -16,10 +16,8 @@ public:
 
 	void send(const Shader& shader) const;
 
-	vec3 position() const { return eye; }
-	mat4 getView() const;
-
 private:
+	mat4 getView() const;
 	mat4 getProj() const;
 
 	// motion

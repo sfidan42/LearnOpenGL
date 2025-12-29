@@ -155,7 +155,7 @@ Model::Model(const string& modelPath)
 void Model::draw(const Shader& shader) const
 {
 	const auto view = registry.view<Mesh>();
-	view.each([shader](const Mesh& mesh) { mesh.draw(shader); });
+	view.each([&shader](const Mesh& mesh) { mesh.draw(shader); });
 }
 
 void Model::loadModel(const string& modelPath)

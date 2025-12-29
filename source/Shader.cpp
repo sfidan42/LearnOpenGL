@@ -63,7 +63,7 @@ static bool compile(GLuint shader, const char* shader_source)
 	{
 		glGetShaderInfoLog(shader, 512, nullptr, infoLog);
 		cerr << "shader compilation failed\n" << infoLog << endl;
-		cerr << shader_source << endl;
+		cerr << "Shader source:\n" << shader_source << endl;
 		return false;
 	}
 	return true;
@@ -121,23 +121,29 @@ GLuint Shader::create(const ShaderSource& shaderCode)
 	if(vertexShader == 0)
 	{
 		cerr << "Failed to create vertex shader" << endl;
-		return false;
+		return 0;
 	}
 	const GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 	if(fragmentShader == 0)
 	{
 		cerr << "Failed to create fragment shader" << endl;
-		return false;
+		return 0;
 	}
 	GLuint shaderProgram = glCreateProgram();
 	if(shaderProgram == 0)
 	{
 		cerr << "Failed to create shader program" << endl;
-		return false;
+		return 0;
 	}
 
-	if(!compile(vertexShader, vertexShaderSource) || !compile(fragmentShader, fragmentShaderSource))
-		return false;
+	if(!compile(vertexShader, vertexShaderSource)) {
+		cerr << "Vertex shader source (on failure):\n" << vertexShaderSource << endl;
+		return 0;
+	}
+	if(!compile(fragmentShader, fragmentShaderSource)) {
+		cerr << "Fragment shader source (on failure):\n" << fragmentShaderSource << endl;
+		return 0;
+	}
 	glAttachShader(shaderProgram, vertexShader);
 	glAttachShader(shaderProgram, fragmentShader);
 	glLinkProgram(shaderProgram);
@@ -146,7 +152,9 @@ GLuint Shader::create(const ShaderSource& shaderCode)
 	{
 		glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
 		cerr << "Shader program linking failed\n" << infoLog << endl;
-		return false;
+		cerr << "Vertex shader source (on link fail):\n" << vertexShaderSource << endl;
+		cerr << "Fragment shader source (on link fail):\n" << fragmentShaderSource << endl;
+		return 0;
 	}
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
