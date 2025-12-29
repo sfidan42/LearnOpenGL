@@ -14,12 +14,12 @@ public:
 	void mouse(float xoffset, float yoffset);
 	void update(float deltaTime);
 
-	void send(const Shader& shader);
+	void send(const Shader& shader) const;
 
 	vec3 position() const { return eye; }
+	mat4 getView() const;
 
 private:
-	mat4 getView() const;
 	mat4 getProj() const;
 
 	// motion

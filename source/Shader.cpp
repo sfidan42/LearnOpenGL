@@ -7,13 +7,13 @@
 bool Shader::load(const string& filepath)
 {
 	source = read(filepath);
-	if (source.vertex.empty() || source.fragment.empty())
+	if(source.vertex.empty() || source.fragment.empty())
 	{
 		cerr << "Failed to read shader from file: " << filepath << "\n";
 		return false;
 	}
 	program = create(source);
-	if (program == 0)
+	if(program == 0)
 	{
 		cerr << "Failed to create shader program from file: " << filepath << "\n";
 		return false;

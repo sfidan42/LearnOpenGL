@@ -4,6 +4,7 @@
 #include "Shader.hpp"
 #include "Components.hpp"
 #include "Light.hpp"
+#include "Skybox.hpp"
 
 class Renderer
 {
@@ -20,6 +21,7 @@ private:
 	GLFWwindow* window = nullptr;
 	Shader* mainShader = nullptr;
 	Shader* skyboxShader = nullptr;
+	Skybox* skybox = nullptr;
 	entt::registry modelRegistry;
 	LightManager lightManager;
 };

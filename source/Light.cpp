@@ -50,6 +50,8 @@ LightManager::LightManager()
 
 void LightManager::send(const Shader& shader) const
 {
+	shader.use();
+
 	// Send directional light
 	shader.setVec3("dirLight.direction", dirLight.direction);
 	shader.setVec3("dirLight.ambient", dirLight.ambient);

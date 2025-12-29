@@ -41,10 +41,11 @@ void Camera::update(const float deltaTime)
 	target = eye + front;
 }
 
-void Camera::send(const Shader& shader)
+void Camera::send(const Shader& shader) const
 {
-	mat4 proj = getProj();
-	mat4 view = getView();
+	shader.use();
+	const mat4 proj = getProj();
+	const mat4 view = getView();
 	shader.setMat4("projection", proj);
 	shader.setMat4("view", view);
 	shader.setVec3("viewPos", eye);

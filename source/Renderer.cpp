@@ -9,9 +9,10 @@
 
 Renderer::~Renderer()
 {
-	// destroy shaders first, because it may use OpenGL context
+	// destroy these first, because they use OpenGL context
 	delete mainShader;
 	delete skyboxShader;
+	delete skybox;
 	if(window)
 		glfwDestroyWindow(window);
 	glfwTerminate();
@@ -20,8 +21,8 @@ Renderer::~Renderer()
 bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath)
 {
 	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	window = glfwCreateWindow(1200, 720, "LearnOpenGL", nullptr, nullptr);
@@ -36,7 +37,7 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 	{
@@ -49,6 +50,7 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 
 	glEnable(GL_DEPTH_TEST);
 	glViewport(0, 0, 1200, 720);
+	g_camera.setAspect(1200, 720);
 
 	glEnable(GL_CULL_FACE);
 
@@ -60,6 +62,27 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 		cout << "Failed to load shaders" << endl;
 		return false;
 	}
+
+	skyboxShader = new Shader();
+	if(!skyboxShader->load(skyboxShaderPath))
+	{
+		cout << "Failed to load skybox shaders" << endl;
+		return false;
+	}
+
+	skybox = new Skybox();
+
+	const string faces[6] = {
+		"right.jpg",
+		"left.jpg",
+		"top.jpg",
+		"bottom.jpg",
+		"front.jpg",
+		"back.jpg"
+	};
+
+	const string skyboxDir = string(DATA_DIR) + "/textures/skybox";
+	skybox->loadFaces(skyboxDir, faces);
 
 	return true;
 }
@@ -80,8 +103,6 @@ void Renderer::run()
 		lastTime = currentTime;
 
 		g_camera.update(deltaTime);
-
-		mainShader->use();
 		g_camera.send(*mainShader);
 		lightManager.send(*mainShader);
 
@@ -105,7 +126,9 @@ void Renderer::run()
 			model.draw(*mainShader);
 		}
 
-		glDepthMask(GL_TRUE);
+		g_camera.send(*skyboxShader);
+		skybox->draw(*skyboxShader);
+
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
