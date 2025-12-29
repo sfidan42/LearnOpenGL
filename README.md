@@ -30,3 +30,5 @@ To build and run the code, follow these steps:
     ![model loading](assets/assimp_and_lights.png)
    3. Proper model loading using ECS architecture:
     ![ecs model loading](assets/renderer_loadModel.png)
+   4. After adding Skybox
+    ![skybox](assets/skyboxed.png)

@@ -81,7 +81,7 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 
 	const string skyboxDir = string(DATA_DIR) + "/textures/skybox";
 	skybox->loadFaces(skyboxDir, faces);
-	skybox->scale(10.0f);
+	skybox->scale(20.0f);
 
 	stbi_set_flip_vertically_on_load(true);
 
