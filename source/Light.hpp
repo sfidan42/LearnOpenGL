@@ -43,9 +43,11 @@ public:
 	LightManager();
 	~LightManager() = default;
 
-	DirLight dirLight{};
+	DirLight sunLight{};
 	std::vector<PointLight> pointLights;
 	std::vector<SpotLight> spotLights;
+	float m_time = 0.0f;
 
+	void update(float deltaTime);
 	void send(const Shader& mainShader, const Shader& skyShader) const;
 };

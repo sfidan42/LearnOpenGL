@@ -6,13 +6,13 @@ LightManager::LightManager()
 {
 	// Dawn: Sun is rising from the east, low angle
 	// A Y-value close to 0.0 puts it on the horizon.
-	dirLight.direction = vec3(-1.0f, 0.15f, 0.0f);
+	sunLight.direction = vec3(-1.0f, -0.5f, 0.0f);
 	// Warmer, dimmer ambient light (purplish-blue)
-	dirLight.ambient = vec3(0.15f, 0.1f, 0.2f);
+	sunLight.ambient = vec3(0.15f, 0.1f, 0.2f);
 	// Strong orange/gold diffuse light
-	dirLight.diffuse = vec3(1.0f, 0.5f, 0.2f);
+	sunLight.diffuse = vec3(1.0f, 0.5f, 0.2f);
 	// Soft yellowish specular highlights
-	dirLight.specular = vec3(0.8f, 0.7f, 0.3f);
+	sunLight.specular = vec3(0.8f, 0.7f, 0.3f);
 
 	// Point light in corner
 	pointLights.resize(1);
@@ -52,16 +52,56 @@ LightManager::LightManager()
 	}
 }
 
+void LightManager::update(float deltaTime)
+{
+	// Adjust speed as needed (e.g., 0.1f for a slow cycle)
+	m_time += deltaTime * 0.2f;
+
+	// 1. Calculate Sun Position
+	float sunX = cosf(m_time);
+	float sunZ = sinf(m_time);
+	float sunY = sinf(m_time);
+
+	sunLight.direction = glm::normalize(vec3(sunX, sunY, sunZ));
+
+	// 2. Define Time-of-Day Colors
+	vec3 deepNight = vec3(0.01f, 0.01f, 0.02f);
+	vec3 sunrise = vec3(1.0f, 0.4f, 0.1f);
+	vec3 noon = vec3(1.0f, 1.0f, 0.9f);
+	vec3 sunset = vec3(0.9f, 0.3f, 0.05f);
+
+	// 3. Dynamic Color Interpolation based on sunY (height)
+	if(sunY > 0.0f)
+	{
+		// Sun is above the horizon (Day/Sunrise/Sunset)
+		// Interpolate between Sunset/Sunrise (low Y) and Noon (high Y)
+		float factor = sunY; // 0.0 at horizon, 1.0 at peak
+		sunLight.diffuse = glm::mix(sunrise, noon, factor);
+		sunLight.ambient = sunLight.diffuse * 0.2f;
+		sunLight.specular = sunLight.diffuse;
+	}
+	else
+	{
+		// Sun is below horizon (Night)
+		// Fade from sunset color to deep night
+		float factor = glm::clamp(sunY * -5.0f, 0.0f, 1.0f);
+		sunLight.diffuse = glm::mix(sunset * 0.1f, deepNight, factor);
+		sunLight.ambient = vec3(0.02f, 0.02f, 0.05f);
+		sunLight.specular = vec3(0.0f);
+	}
+}
+
 void LightManager::send(const Shader& mainShader, const Shader& skyShader) const
 {
 	mainShader.use();
 
 	// Send directional light
-	mainShader.setVec3("dirLight.direction", dirLight.direction);
-	mainShader.setVec3("dirLight.ambient", dirLight.ambient);
-	mainShader.setVec3("dirLight.diffuse", dirLight.diffuse);
-	mainShader.setVec3("dirLight.specular", dirLight.specular);
+	mainShader.setVec3("sunLight.direction", sunLight.direction);
+	mainShader.setVec3("sunLight.ambient", sunLight.ambient);
+	mainShader.setVec3("sunLight.diffuse", sunLight.diffuse);
+	mainShader.setVec3("sunLight.specular", sunLight.specular);
 
+	mainShader.setInt("u_numPointLights", static_cast<int>(pointLights.size()));
 	// Send point lights
 	for(size_t i = 0; i < pointLights.size(); ++i)
 	{
@@ -75,6 +115,7 @@ void LightManager::send(const Shader& mainShader, const Shader& skyShader) const
 		mainShader.setVec3(base + ".specular", pointLights[i].specular);
 	}
 
+	mainShader.setInt("u_numSpotLights", static_cast<int>(spotLights.size()));
 	// Send spotlights
 	for(size_t i = 0; i < spotLights.size(); ++i)
 	{
@@ -91,12 +132,10 @@ void LightManager::send(const Shader& mainShader, const Shader& skyShader) const
 		mainShader.setVec3(base + ".specular", spotLights[i].specular);
 	}
 
-	// TODO: fix skybox lighting
-
 	skyShader.use();
 
-	skyShader.setVec3("dirLight.direction", dirLight.direction);
-	skyShader.setVec3("dirLight.ambient", dirLight.ambient);
-	skyShader.setVec3("dirLight.diffuse", dirLight.diffuse);
-	skyShader.setVec3("dirLight.specular", dirLight.specular);
+	skyShader.setVec3("sunLight.direction", sunLight.direction);
+	skyShader.setVec3("sunLight.ambient", sunLight.ambient);
+	skyShader.setVec3("sunLight.diffuse", sunLight.diffuse);
+	skyShader.setVec3("sunLight.specular", sunLight.specular);
 }

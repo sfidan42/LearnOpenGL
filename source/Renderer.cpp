@@ -103,6 +103,7 @@ void Renderer::run()
 		const float deltaTime = currentTime - lastTime;
 		lastTime = currentTime;
 
+		lightManager.update(deltaTime);
 		lightManager.send(*mainShader, *skyboxShader);
 
 		g_camera.update(deltaTime);

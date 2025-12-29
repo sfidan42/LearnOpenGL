@@ -77,12 +77,17 @@ struct SpotLight
     vec3 specular;
 };
 
-#define NR_POINT_LIGHTS 1
-#define NR_SPOT_LIGHTS 3
+#define MAX_POINT_LIGHTS 16
+#define MAX_SPOT_LIGHTS 16
 
 uniform DirLight dirLight;
-uniform PointLight pointLights[NR_POINT_LIGHTS];
-uniform SpotLight spotLights[NR_SPOT_LIGHTS];
+
+uniform PointLight pointLights[MAX_POINT_LIGHTS];
+uniform int u_numPointLights;
+
+uniform SpotLight spotLights[MAX_SPOT_LIGHTS];
+uniform int u_numSpotLights;
+
 uniform vec3 viewPos;
 
 // ================= FUNCTION PROTOTYPES =================
@@ -103,10 +108,10 @@ void main()
 
     result += CalcDirLight(dirLight, norm, viewDir);
 
-    for (int i = 0; i < NR_POINT_LIGHTS; i++)
+    for (int i = 0; i < u_numPointLights; i++)
         result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
 
-    for (int i = 0; i < NR_SPOT_LIGHTS; i++)
+    for (int i = 0; i < u_numSpotLights; i++)
         result += CalcSpotLight(spotLights[i], norm, FragPos, viewDir);
 
     // Gamma correction

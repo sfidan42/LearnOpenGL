@@ -28,7 +28,7 @@ struct DirLight
 
 in vec3 textureDir;
 
-uniform DirLight dirLight;
+uniform DirLight sunLight;
 uniform samplerCube cubemap;
 
 out vec4 FragColor;
@@ -38,7 +38,11 @@ void main()
     vec3 envColor = texture(cubemap, textureDir).rgb;
 
     vec3 normalDir = normalize(textureDir);
-    vec3 sunDir = normalize(-dirLight.direction);
+
+    // Use the direction AS the target.
+    // If direction is (0, 1, 0), the sun is at the top.
+    vec3 sunDir = normalize(sunLight.direction);
+
     float cosTheta = max(dot(normalDir, sunDir), 0.0);
 
     // Create the Sun Disk and Atmosphere Glow
@@ -48,10 +52,10 @@ void main()
 
     // Combine colors
     // We add the sunlight (diffuse color) multiplied by our glow factors
-    vec3 sunEffect = (sunGlow * dirLight.diffuse * 0.5) + (sunDisk * dirLight.specular);
+    vec3 sunEffect = (sunGlow * sunLight.diffuse * 0.5) + (sunDisk * sunLight.specular);
 
-    // Apply a subtle ambient boost to the whole sky based on the light
-    vec3 finalColor = envColor + sunEffect + (dirLight.ambient * 0.1);
+    // Final color combines environment and sun effects
+    vec3 finalColor = (envColor * sunLight.diffuse) + sunEffect;
 
     FragColor = vec4(finalColor, 1.0);
 }
