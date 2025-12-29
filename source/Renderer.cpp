@@ -18,6 +18,71 @@ Renderer::~Renderer()
 	glfwTerminate();
 }
 
+void onInstanceAdded(entt::registry& registry, entt::entity instanceEnt)
+{
+	auto& inst = registry.get<InstanceComponent>(instanceEnt);
+
+	if(!registry.valid(inst.modelEntity))
+		return;
+
+	auto& modelComp = registry.get<ModelComponent>(inst.modelEntity);
+
+	modelComp.instances.push_back(instanceEnt);
+}
+
+void onInstanceRemoved(entt::registry& registry, entt::entity instanceEnt)
+{
+	// The component still exists at this point
+	auto& inst = registry.get<InstanceComponent>(instanceEnt);
+
+	if(!registry.valid(inst.modelEntity))
+		return;
+
+	auto& instances = registry.get<ModelComponent>(inst.modelEntity).instances;
+
+	erase(instances, instanceEnt);
+}
+
+void onInstanceUpdated(entt::registry& registry, entt::entity instanceEnt)
+{
+	auto& inst = registry.get<InstanceComponent>(instanceEnt);
+
+	// Previous value is available through the patch mechanism
+	registry.patch<InstanceComponent>(instanceEnt, [&](auto& previous)
+	{
+		if(previous.modelEntity == inst.modelEntity)
+			return;
+
+		// Remove from old model
+		if(registry.valid(previous.modelEntity))
+		{
+			auto& oldList =
+				registry.get<ModelComponent>(previous.modelEntity).instances;
+			erase(oldList, instanceEnt);
+		}
+
+		// Add to new model
+		if(registry.valid(inst.modelEntity))
+		{
+			auto& newList =
+				registry.get<ModelComponent>(inst.modelEntity).instances;
+			newList.push_back(instanceEnt);
+		}
+	});
+}
+
+void setupInstanceTracking(entt::registry& registry)
+{
+	registry.on_construct<InstanceComponent>()
+			.connect<&onInstanceAdded>();
+
+	registry.on_destroy<InstanceComponent>()
+			.connect<&onInstanceRemoved>();
+
+	registry.on_update<InstanceComponent>()
+			.connect<&onInstanceUpdated>();
+}
+
 bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath)
 {
 	glfwInit();
@@ -85,6 +150,8 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 
 	stbi_set_flip_vertically_on_load(true);
 
+	setupInstanceTracking(modelRegistry);
+
 	return true;
 }
 
@@ -109,24 +176,29 @@ void Renderer::run()
 		g_camera.update(deltaTime);
 		g_camera.send(*mainShader, *skyboxShader);
 
-		auto renderView = modelRegistry.view<InstanceComponent, TransformComponent>();
-		glDepthMask(GL_TRUE);
-		for(auto e : renderView)
+		mainShader->use();
+		for (const auto modelEnt : modelRegistry.view<ModelComponent>())
 		{
-			auto& [modelEntity] = renderView.get<InstanceComponent>(e);
-			auto& [positionVec, rotationVec, scaleVec] = renderView.get<TransformComponent>(e);
-			auto& [path, model] = modelRegistry.get<ModelComponent>(modelEntity);
+			auto& modelComp = modelRegistry.get<ModelComponent>(modelEnt);
+			if (modelComp.instances.empty())
+				continue;
 
-			mat4 modelMat(1.0f);
-			modelMat = translate(modelMat, positionVec);
-			modelMat = rotate(modelMat, rotationVec.x, {1, 0, 0});
-			modelMat = rotate(modelMat, rotationVec.y, {0, 1, 0});
-			modelMat = rotate(modelMat, rotationVec.z, {0, 0, 1});
-			modelMat = scale(modelMat, scaleVec);
+			vector<mat4> matrices(modelComp.instances.size());
+			for (size_t i = 0; i < modelComp.instances.size(); ++i)
+			{
+				auto instanceEnt = modelComp.instances[i];
+				auto& [positionVec, rotationVec, scaleVec] = modelRegistry.get<TransformComponent>(instanceEnt);
 
-			mainShader->use();
-			mainShader->setMat4("model", modelMat);
-			model.draw(*mainShader);
+				mat4 modelMat(1.0f);
+				modelMat = translate(modelMat, positionVec);
+				modelMat = rotate(modelMat, rotationVec.x, {1, 0, 0});
+				modelMat = rotate(modelMat, rotationVec.y, {0, 1, 0});
+				modelMat = rotate(modelMat, rotationVec.z, {0, 0, 1});
+				modelMat = scale(modelMat, scaleVec);
+
+				matrices[i] = modelMat;
+			}
+			modelComp.model.drawInstanced(*mainShader, matrices);
 		}
 
 		skybox->draw(*skyboxShader);
@@ -136,7 +208,7 @@ void Renderer::run()
 	}
 }
 
-void Renderer::loadModel(const std::string& modelPath, const TransformComponent& transform)
+void Renderer::loadModel(const string& modelPath, const TransformComponent& transform)
 {
 	// TODO: some models need glCullFace(GL_FRONT), others GL_BACK or disabled culling
 	entt::entity modelEntity = entt::null;
@@ -154,8 +226,8 @@ void Renderer::loadModel(const std::string& modelPath, const TransformComponent&
 
 	if(modelEntity == entt::null)
 	{
-		const std::string base(DATA_DIR);
-		const std::string fullPath = base + "/models/" + modelPath;
+		const string base(DATA_DIR);
+		const string fullPath = base + "/models/" + modelPath;
 
 		modelEntity = modelRegistry.create();
 		modelRegistry.emplace<ModelComponent>(

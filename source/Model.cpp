@@ -24,12 +24,44 @@ void Mesh::setup(const vector<Vertex>& vertices, const vector<Index>& indices,
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
 				 indices.data(), GL_STATIC_DRAW);
 
-	Vertex::vertexAttributes();
+	GLuint next = Vertex::vertexAttributes();
+
+	glBindVertexArray(0);
+
+	// 1. Generate the Instance VBO
+	glGenBuffers(1, &instanceVBO);
+	glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+
+	// We bind the VAO to attach the new attributes to it
+	glBindVertexArray(VAO);
+
+	for (unsigned int i = 0; i < 4; i++) {
+		glEnableVertexAttribArray(next + i);
+		glVertexAttribPointer(next + i, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)(sizeof(vec4) * i));
+		// Tell OpenGL this attribute advances per instance, not per vertex
+		glVertexAttribDivisor(next + i, 1);
+	}
 
 	glBindVertexArray(0);
 }
 
-void Mesh::draw(const Shader& shader) const
+void Mesh::drawInstanced(const Shader& shader, const vector<mat4>& matrices) const
+{
+	// Upload the gathered matrices to the instanceVBO
+	glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+	glBufferData(GL_ARRAY_BUFFER, matrices.size() * sizeof(mat4), matrices.data(), GL_DYNAMIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	bind(shader);
+
+	int instanceCount = static_cast<int>(matrices.size());
+
+	glBindVertexArray(VAO);
+	glDrawElementsInstanced(GL_TRIANGLES, static_cast<int>(indices.size()), GL_UNSIGNED_INT, 0, instanceCount);
+	glBindVertexArray(0);
+}
+
+void Mesh::bind(const Shader& shader) const
 {
 	// Bind multiple diffuse textures into sampler array u_diffuseTextures and set count
 	const unsigned int MAX_DIFFUSE = 16; // must match shader array size
@@ -70,14 +102,6 @@ void Mesh::draw(const Shader& shader) const
 	// tell shader how many diffuse textures are bound
 	shader.setInt("u_numDiffuseTextures", diffuseCount);
 	shader.setInt("u_numSpecularTextures", specularCount);
-
-	// draw mesh
-	glBindVertexArray(VAO);
-	glDrawElements(GL_TRIANGLES, static_cast<int>(indices.size()), GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
-
-	// always good practice to set everything back to defaults once configured.
-	glActiveTexture(GL_TEXTURE0);
 }
 
 bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID)
@@ -150,12 +174,6 @@ Model::Model(const string& modelPath)
 	for(auto [ent, tex] : texturesView.each())
 		cout << "\tTextureComponent ID: " << tex.id << ", Type: " << tex.type << ", Path: " << tex.path << endl;
 	cout << "----------------------------------------" << endl;
-}
-
-void Model::draw(const Shader& shader) const
-{
-	const auto view = registry.view<Mesh>();
-	view.each([&shader](const Mesh& mesh) { mesh.draw(shader); });
 }
 
 void Model::loadModel(const string& modelPath)
@@ -370,4 +388,10 @@ Model& Model::operator=(Model&& other) noexcept
 		registry = std::move(other.registry);
 	}
 	return *this;
+}
+
+void Model::drawInstanced(const Shader& shader, const vector<mat4>& matrices) const
+{
+	const auto view = registry.view<Mesh>();
+	view.each([&shader, &matrices](const Mesh& mesh) { mesh.drawInstanced(shader, matrices); });
 }

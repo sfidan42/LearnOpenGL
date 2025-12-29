@@ -20,13 +20,14 @@ struct TextureComponent
 	string path;
 };
 
+struct InstanceComponent
+{
+	entt::entity modelEntity;
+};
+
 struct ModelComponent
 {
 	string path;
 	Model model;
-};
-
-struct InstanceComponent
-{
-	entt::entity modelEntity;
+	std::vector<entt::entity> instances;
 };

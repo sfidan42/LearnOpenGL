@@ -3,10 +3,10 @@
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aTexCoord;
+layout (location = 3) in mat4 aInstanceMatrix;
 
 uniform mat4 projection;
 uniform mat4 view;
-uniform mat4 model;
 
 out vec3 FragPos;
 out vec3 Normal;
@@ -14,10 +14,10 @@ out vec2 TexCoord;
 
 void main()
 {
-    FragPos = vec3(model * vec4(aPos, 1.0));
-    Normal = mat3(transpose(inverse(model))) * aNormal;
+    FragPos = vec3(aInstanceMatrix * vec4(aPos, 1.0));
+    Normal = mat3(transpose(inverse(aInstanceMatrix))) * aNormal;
     TexCoord = aTexCoord;
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
+    gl_Position = projection * view * aInstanceMatrix * vec4(aPos, 1.0);
 }
 
 #shader fragment
@@ -80,7 +80,7 @@ struct SpotLight
 #define MAX_POINT_LIGHTS 16
 #define MAX_SPOT_LIGHTS 16
 
-uniform DirLight dirLight;
+uniform DirLight sunLight;
 
 uniform PointLight pointLights[MAX_POINT_LIGHTS];
 uniform int u_numPointLights;
@@ -106,7 +106,7 @@ void main()
 
     vec3 result = vec3(0.0);
 
-    result += CalcDirLight(dirLight, norm, viewDir);
+    result += CalcDirLight(sunLight, norm, viewDir);
 
     for (int i = 0; i < u_numPointLights; i++)
         result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
