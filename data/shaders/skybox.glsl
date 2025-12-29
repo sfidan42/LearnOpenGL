@@ -15,6 +15,7 @@ void main()
     vec4 pos = projection * view * vec4(aPos * scaleFactor, 1.0);
     gl_Position = pos.xyww; // set gl_Position with w component for depth correction
 }
+
 #shader fragment
 #version 460 core
 

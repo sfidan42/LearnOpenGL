@@ -89,6 +89,7 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_SAMPLES, 4); // MSAA
 
 	window = glfwCreateWindow(1200, 720, "LearnOpenGL", nullptr, nullptr);
 	if(window == nullptr)
@@ -118,6 +119,9 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	g_camera.setAspect(1200, 720);
 
 	glEnable(GL_CULL_FACE);
+
+	// My redundant MSAA enable call
+	glEnable(GL_MULTISAMPLE);
 
 	mainShader = new Shader();
 	if(!mainShader->load(mainShaderPath))
