@@ -1,6 +1,8 @@
 #include "Renderer.hpp"
 #include <glm/ext.hpp>
 
+#include "callbacks.hpp"
+
 int main()
 {
 	Renderer renderer;
@@ -40,16 +42,11 @@ int main()
 	}
 
 	const vector tilesTransforms = {
-		TransformComponent{vec3(0.0f, -1.5f, 0.0f), vec3(0.0f), vec3(10.0f)}
+		TransformComponent{vec3(0.0f, -1.5f, 0.0f), vec3(0.0f), vec3(0.5f)}
 	};
 
-	float alphaStep = 1.0f / static_cast<float>(backpackTransforms.size());
-	float blendAlpha = 0.0f;
 	for (const TransformComponent& transform : backpackTransforms)
-	{
-		renderer.loadModel("backpack/backpack.obj", transform, blendAlpha);
-		blendAlpha += alphaStep;
-	}
+		renderer.loadModel("backpack/backpack.obj", transform);
 
 	for (const TransformComponent& transform : tilesTransforms)
 		renderer.loadModel("interior_tiles_1k.glb", transform);

@@ -13,7 +13,7 @@ public:
 	bool init(const vector<string>& shaderFilepaths);
 	void run();
 
-	void loadModel(const string& modelPath, const TransformComponent& transform, float blendAlpha = 1.0f);
+	void loadModel(const string& modelPath, const TransformComponent& transform);
 
 private:
 	GLFWwindow* window = nullptr;

@@ -164,7 +164,11 @@ void Model::loadModel(const string& modelPath)
 	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(
 		modelPath,
-		aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_TransformUVCoords | aiProcess_FlipUVs);
+		aiProcess_Triangulate
+		| aiProcess_GenSmoothNormals
+		| aiProcess_TransformUVCoords
+		| aiProcess_FlipUVs
+	);
 	// check for errors
 	if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
 	{
@@ -179,54 +183,47 @@ void Model::loadModel(const string& modelPath)
 	cout << "Model loaded successfully from: " << modelPath << endl;
 }
 
-void Model::processNode(aiNode* node, const aiScene* scene)
+void Model::processNode(aiNode* node, const aiScene* scene, const aiMatrix4x4& parentTransform)
 {
-	// process each mesh located at the current node
+	// Combine the current node's transformation with the parent's transformation
+	aiMatrix4x4 nodeTransform = parentTransform * node->mTransformation;
+
+	// Process each mesh located at the current node
 	for(unsigned int i = 0; i < node->mNumMeshes; i++)
 	{
-		// the node object only contains indices to index the actual objects in the scene.
-		// the scene contains all the data, node is just to keep stuff organized (like relations between nodes).
 		aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-		processMesh(mesh, scene);
+		processMesh(mesh, scene, nodeTransform);
 	}
-	// after we've processed all the meshes (if any) we then recursively process each of the children nodes
+
+	// Recursively process each of the children nodes
 	for(unsigned int i = 0; i < node->mNumChildren; i++)
 	{
-		processNode(node->mChildren[i], scene);
+		processNode(node->mChildren[i], scene, nodeTransform);
 	}
 }
 
-void Model::processMesh(aiMesh* mesh, const aiScene* scene)
+void Model::processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& transform)
 {
-	// data to fill
+	// Apply the transformation to the vertices
 	vector<Vertex> vertices;
-	vector<unsigned int> indices;
-	vector<TextureComponent> textures;
+	vector<unsigned int> indices; // Declare indices in the correct scope
+	vector<TextureComponent> textures; // Declare textures in the correct scope
 
-	// walk through each of the mesh's vertices
 	for(unsigned int i = 0; i < mesh->mNumVertices; i++)
 	{
-		Vertex vertex{}; // initialize to avoid uninitialized warnings
-		vec3 vector;
-		// positions
-		vector.x = mesh->mVertices[i].x;
-		vector.y = mesh->mVertices[i].y;
-		vector.z = mesh->mVertices[i].z;
-		vertex.Position = vector;
+		Vertex vertex;
+		aiVector3D transformedPosition = transform * mesh->mVertices[i];
+		vertex.Position = vec3(transformedPosition.x, transformedPosition.y, transformedPosition.z);
 		// normals
 		if(mesh->HasNormals())
 		{
-			vector.x = mesh->mNormals[i].x;
-			vector.y = mesh->mNormals[i].y;
-			vector.z = mesh->mNormals[i].z;
-			vertex.Normal = vector;
+			aiVector3D transformedNormal = transform * mesh->mNormals[i];
+			vertex.Normal = vec3(transformedNormal.x, transformedNormal.y, transformedNormal.z);
 		}
 		// texture coordinates
 		if(mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
 		{
 			vec2 vec;
-			// a vertex can contain up to 8 different texture coordinates. We thus make the assumption that we won't
-			// use models where a vertex can have multiple texture coordinates so we always take the first set (0).
 			vec.x = mesh->mTextureCoords[0][i].x;
 			vec.y = mesh->mTextureCoords[0][i].y;
 			vertex.TexCoords = vec;
@@ -236,23 +233,21 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene)
 
 		vertices.push_back(vertex);
 	}
-	// now wak through each of the mesh's faces (a face is a mesh its triangle) and retrieve the corresponding vertex indices.
+
 	for(unsigned int i = 0; i < mesh->mNumFaces; i++)
 	{
 		aiFace face = mesh->mFaces[i];
-		// retrieve all indices of the face and store them in the indices vector
 		for(unsigned int j = 0; j < face.mNumIndices; j++)
 			indices.push_back(face.mIndices[j]);
 	}
+
 	aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 	vector<TextureComponent> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "diffuse", scene);
-	vector<TextureComponent> specularMaps =
-		loadMaterialTextures(material, aiTextureType_SPECULAR, "specular", scene);
+	vector<TextureComponent> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "specular", scene);
 
 	textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
 	textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
-	// return a mesh object created from the extracted mesh data
 	Mesh& meshComp = registry.emplace<Mesh>(registry.create());
 	meshComp.setup(vertices, indices, textures);
 }

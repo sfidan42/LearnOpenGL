@@ -11,8 +11,7 @@
 Renderer::~Renderer()
 {
 	// destroy shader first, because it may use OpenGL context
-	if(shader)
-		delete shader;
+	delete shader;
 	if(window)
 		glfwDestroyWindow(window);
 	glfwTerminate();
@@ -86,13 +85,12 @@ void Renderer::run()
 		g_camera.send(*shader);
 		lightManager.send(*shader);
 
-		auto opaqueView = modelRegistry.view<InstanceComponent, TransformComponent>(
-			entt::exclude<TransparencyComponent>);
+		auto renderView = modelRegistry.view<InstanceComponent, TransformComponent>();
 		glDepthMask(GL_TRUE);
-		for(auto e : opaqueView)
+		for(auto e : renderView)
 		{
-			auto& [modelEntity] = opaqueView.get<InstanceComponent>(e);
-			auto& [positionVec, rotationVec, scaleVec] = opaqueView.get<TransformComponent>(e);
+			auto& [modelEntity] = renderView.get<InstanceComponent>(e);
+			auto& [positionVec, rotationVec, scaleVec] = renderView.get<TransformComponent>(e);
 			auto& [path, model] = modelRegistry.get<ModelComponent>(modelEntity);
 
 			mat4 modelMat(1.0f);
@@ -106,49 +104,15 @@ void Renderer::run()
 			shader->setMat4("model", modelMat);
 			model.draw(*shader);
 		}
-		auto transparentView = modelRegistry.view<InstanceComponent, TransformComponent, TransparencyComponent>();
-		std::vector<entt::entity> sorted;
-		for(auto e : transparentView)
-			sorted.push_back(e);
-		// sort back-to-front
-		ranges::sort(sorted,
-					 [&](const entt::entity a, const entt::entity b)
-					 {
-						 const auto& ta = modelRegistry.get<TransformComponent>(a);
-						 const auto& tb = modelRegistry.get<TransformComponent>(b);
 
-						 return length(g_camera.position() - ta.position) >
-							 length(g_camera.position() - tb.position);
-					 });
-		glDepthMask(GL_FALSE);
-		for (auto e : sorted)
-		{
-			auto& [modelEntity] = transparentView.get<InstanceComponent>(e);
-			auto& [positionVec, rotationVec, scaleVec] = transparentView.get<TransformComponent>(e);
-			auto& [alpha] = transparentView.get<TransparencyComponent>(e);
-			auto& [path, model] = modelRegistry.get<ModelComponent>(modelEntity);
-
-			mat4 modelMat(1.0f);
-			modelMat = translate(modelMat, positionVec);
-			modelMat = rotate(modelMat, rotationVec.x, {1, 0, 0});
-			modelMat = rotate(modelMat, rotationVec.y, {0, 1, 0});
-			modelMat = rotate(modelMat, rotationVec.z, {0, 0, 1});
-			modelMat = scale(modelMat, scaleVec);
-
-			shader->setFloat("u_Alpha", alpha);
-			shader->setMat4("model", modelMat);
-			model.draw(*shader);
-		}
 		glDepthMask(GL_TRUE);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 }
 
-void Renderer::loadModel(const std::string& modelPath, const TransformComponent& transform, float blendAlpha)
+void Renderer::loadModel(const std::string& modelPath, const TransformComponent& transform)
 {
-	assert(0.0f <= blendAlpha && blendAlpha <= 1.0f && "blendAlpha must be in [0.0, 1.0]");
-
 	entt::entity modelEntity = entt::null;
 
 	// 1. Find or create the model resource entity
@@ -179,6 +143,4 @@ void Renderer::loadModel(const std::string& modelPath, const TransformComponent&
 	const entt::entity instance = modelRegistry.create();
 	modelRegistry.emplace<InstanceComponent>(instance, modelEntity);
 	modelRegistry.emplace<TransformComponent>(instance, transform);
-	if(blendAlpha < 1.0f)
-		modelRegistry.emplace<TransparencyComponent>(instance, blendAlpha);
 }

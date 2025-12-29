@@ -4,7 +4,7 @@
 
 mat4 Camera::getView() const
 {
-	return lookAt(eye, target, up);
+	return glm::lookAt(eye, target, up);
 }
 
 mat4 Camera::getProj() const
