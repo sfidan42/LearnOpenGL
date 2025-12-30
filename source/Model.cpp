@@ -35,7 +35,8 @@ void Mesh::setup(const vector<Vertex>& vertices, const vector<Index>& indices,
 	// We bind the VAO to attach the new attributes to it
 	glBindVertexArray(VAO);
 
-	for (unsigned int i = 0; i < 4; i++) {
+	for(unsigned int i = 0; i < 4; i++)
+	{
 		glEnableVertexAttribArray(next + i);
 		glVertexAttribPointer(next + i, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)(sizeof(vec4) * i));
 		// Tell OpenGL this attribute advances per instance, not per vertex
@@ -139,25 +140,22 @@ bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents
 	return format != -1;
 }
 
-unsigned int TextureFromFile(const char* path, const string& directory)
+GLuint TextureFromFile(const string& fullPath)
 {
-	string filename = string(path);
-	filename = directory + '/' + filename;
-
 	unsigned int textureID = 0;
 	glGenTextures(1, &textureID);
 
 	int width, height, nrComponents;
-	unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
+	unsigned char* data = stbi_load(fullPath.c_str(), &width, &height, &nrComponents, 0);
 	if(data)
 	{
 		if(!ProcessTexture(data, width, height, nrComponents, textureID))
-			cout << "Failed to process texture at path: " << path << endl;
+			cout << "Failed to process texture at path: " << fullPath << endl;
 		stbi_image_free(data);
 	}
 	else
 	{
-		cout << "TextureComponent failed to load at path: " << path << endl;
+		cout << "TextureComponent failed to load at path: " << fullPath << endl;
 		stbi_image_free(data);
 	}
 
@@ -169,7 +167,7 @@ Model::Model(const string& modelPath)
 	cout << "------------------Model-------------------" << endl;
 	loadModel(modelPath);
 	cout << "Number of meshes: " << registry.view<Mesh>().storage()->size() << endl;
-	auto texturesView = registry.view<TextureComponent>();
+	const auto texturesView = registry.view<TextureComponent>();
 	cout << "Number of textures loaded: " << texturesView.storage()->size() << endl;
 	for(auto [ent, tex] : texturesView.each())
 		cout << "\tTextureComponent ID: " << tex.id << ", Type: " << tex.type << ", Path: " << tex.path << endl;
@@ -322,10 +320,10 @@ vector<TextureComponent> Model::loadMaterialTextures(aiMaterial* mat, aiTextureT
 					{
 						// compressed image format (PNG/JPEG) inside memory
 						// atex->mWidth stores size in bytes and pcData points to that memory
-						unsigned int size = atex->mWidth;
+						const unsigned int size = atex->mWidth;
 						data = stbi_load_from_memory(
 							static_cast<unsigned char*>(const_cast<void*>(reinterpret_cast<const void*>(atex->
-								pcData))), (int)size, &width, &height, &nrComponents, 0);
+								pcData))), static_cast<int>(size), &width, &height, &nrComponents, 0);
 					}
 					else
 					{
@@ -365,7 +363,7 @@ vector<TextureComponent> Model::loadMaterialTextures(aiMaterial* mat, aiTextureT
 			}
 
 			// fallback: try loading texture from file on disk
-			texture.id = TextureFromFile(str.C_Str(), this->directory);
+			texture.id = TextureFromFile(this->directory + "/" + str.C_Str());
 			texture.type = typeName;
 			texture.path = str.C_Str();
 			textures.push_back(texture);
@@ -378,7 +376,8 @@ vector<TextureComponent> Model::loadMaterialTextures(aiMaterial* mat, aiTextureT
 
 Model::Model(Model&& other) noexcept
 : directory(std::move(other.directory)),
-  registry(std::move(other.registry)) {}
+  registry(std::move(other.registry))
+{}
 
 Model& Model::operator=(Model&& other) noexcept
 {

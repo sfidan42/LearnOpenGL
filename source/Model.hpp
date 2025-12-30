@@ -27,7 +27,7 @@ private:
 };
 
 bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID);
-unsigned int TextureFromFile(const char* path, const string& directory);
+GLuint TextureFromFile(const string& fullPath);
 
 class Model
 {
