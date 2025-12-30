@@ -49,7 +49,7 @@ private:
 	void loadModel(const string& modelPath);
 	void processNode(aiNode* node, const aiScene* scene, const aiMatrix4x4& parentTransform = aiMatrix4x4());
 	void processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& transform);
-	vector<TextureComponent> loadMaterialTextures(aiMaterial* mat, aiTextureType type,
+	vector<TextureComponent> loadMaterialTextures(const aiMaterial* mat, aiTextureType type,
 												  const string& typeName, const aiScene* scene);
 	string directory;
 	entt::registry registry;

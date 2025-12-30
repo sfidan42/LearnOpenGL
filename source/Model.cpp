@@ -70,7 +70,7 @@ void Mesh::bind(const Shader& shader) const
 	int texUnit = 0;
 	int diffuseCount = 0;
 	int specularCount = 0;
-
+	int normalCount = 0;
 	for(const auto& texture : textures)
 	{
 		const string& name = texture.type;
@@ -92,6 +92,15 @@ void Mesh::bind(const Shader& shader) const
 			++specularCount;
 			++texUnit;
 		}
+		else if(name == "normal")
+		{
+			// bind normal map to a single sampler if present (backwards-compatible)
+			glActiveTexture(GL_TEXTURE0 + texUnit);
+			glBindTexture(GL_TEXTURE_2D, texture.id);
+			shader.setInt(string("u_normalTextures[") + to_string(normalCount) + string("]"), texUnit);
+			++normalCount;
+			++texUnit;
+		}
 		else
 		{
 			// For any other texture types, bind them but don't set specific uniforms by default
@@ -104,6 +113,7 @@ void Mesh::bind(const Shader& shader) const
 	// tell shader how many diffuse textures are bound
 	shader.setInt("u_numDiffuseTextures", diffuseCount);
 	shader.setInt("u_numSpecularTextures", specularCount);
+	shader.setInt("u_numNormalTextures", normalCount);
 }
 
 bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID)
@@ -185,6 +195,8 @@ void Model::loadModel(const string& modelPath)
 		| aiProcess_GenSmoothNormals
 		| aiProcess_TransformUVCoords
 		| aiProcess_FlipUVs
+		| aiProcess_CalcTangentSpace
+		| aiProcess_JoinIdenticalVertices
 	);
 	// check for errors
 	if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
@@ -223,12 +235,12 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& t
 {
 	// Apply the transformation to the vertices
 	vector<Vertex> vertices;
-	vector<unsigned int> indices; // Declare indices in the correct scope
+	vector<Index> indices; // Declare indices in the correct scope
 	vector<TextureComponent> textures; // Declare textures in the correct scope
 
 	for(unsigned int i = 0; i < mesh->mNumVertices; i++)
 	{
-		Vertex vertex;
+		Vertex vertex{};
 		aiVector3D transformedPosition = transform * mesh->mVertices[i];
 		vertex.Position = vec3(transformedPosition.x, transformedPosition.y, transformedPosition.z);
 		// normals
@@ -248,6 +260,13 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& t
 		else
 			vertex.TexCoords = vec2(0.0f, 0.0f);
 
+		// tangent
+		if(mesh->HasTangentsAndBitangents())
+		{
+			aiVector3D transformedTangent = transform * mesh->mTangents[i];
+			vertex.Tangent = vec3(transformedTangent.x, transformedTangent.y, transformedTangent.z);
+		}
+
 		vertices.push_back(vertex);
 	}
 
@@ -261,15 +280,20 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& t
 	aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 	vector<TextureComponent> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "diffuse", scene);
 	vector<TextureComponent> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "specular", scene);
+	vector<TextureComponent> normalMaps = loadMaterialTextures(material, aiTextureType_NORMALS, "normal", scene);
+	if(normalMaps.empty())
+		normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "normal", scene);
 
 	textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
 	textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+	textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
 
-	Mesh& meshComp = registry.emplace<Mesh>(registry.create());
+	entt::entity entity = registry.create();
+	Mesh& meshComp = registry.emplace<Mesh>(entity);
 	meshComp.setup(vertices, indices, textures);
 }
 
-vector<TextureComponent> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type, const string& typeName,
+vector<TextureComponent> Model::loadMaterialTextures(const aiMaterial* mat, aiTextureType type, const string& typeName,
 													 const aiScene* scene)
 {
 	vector<TextureComponent> textures;

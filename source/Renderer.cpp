@@ -46,9 +46,6 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 		return false;
 	}
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
 	glEnable(GL_DEPTH_TEST);
 	glViewport(0, 0, 1200, 720);
 	g_camera.setAspect(1200, 720);

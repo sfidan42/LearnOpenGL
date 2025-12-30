@@ -3,21 +3,35 @@
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aTexCoord;
-layout (location = 3) in mat4 aInstanceMatrix;
+layout (location = 3) in vec3 aTangent;
+layout (location = 4) in mat4 aInstanceMatrix;
 
 uniform mat4 projection;
 uniform mat4 view;
 
 out vec3 FragPos;
-out vec3 Normal;
 out vec2 TexCoord;
+out mat3 TBN;
 
 void main()
 {
     FragPos = vec3(aInstanceMatrix * vec4(aPos, 1.0));
-    Normal = mat3(transpose(inverse(aInstanceMatrix))) * aNormal;
     TexCoord = aTexCoord;
-    gl_Position = projection * view * aInstanceMatrix * vec4(aPos, 1.0);
+
+    // Normal matrix for instancing
+    mat3 normalMatrix = mat3(transpose(inverse(aInstanceMatrix)));
+
+    vec3 N = normalize(normalMatrix * aNormal);
+    vec3 T = normalize(normalMatrix * aTangent);
+
+    // Re-orthogonalize tangent
+    T = normalize(T - dot(T, N) * N);
+
+    vec3 B = cross(N, T);
+
+    TBN = mat3(T, B, N);
+
+    gl_Position = projection * view * vec4(FragPos, 1.0);
 }
 
 #shader fragment
@@ -25,16 +39,16 @@ void main()
 
 // ================= INPUTS =================
 in vec3 FragPos;
-in vec3 Normal;
 in vec2 TexCoord;
+in mat3 TBN;
 
 out vec4 FragColor;
 
 // ================= TEXTURE ARRAYS =================
-uniform sampler2D u_diffuseTextures[16];
+uniform sampler2D u_diffuseTextures[8];
 uniform int u_numDiffuseTextures;
 
-uniform sampler2D u_specularTextures[16];
+uniform sampler2D u_specularTextures[8];
 uniform int u_numSpecularTextures;
 
 float shininess = 32;
@@ -90,6 +104,11 @@ uniform int u_numSpotLights;
 
 uniform vec3 viewPos;
 
+// ================= TANGENT SPACE NORMAL MAP =================
+
+uniform sampler2D u_normalMap;
+uniform bool u_useNormalMap;
+
 // ================= FUNCTION PROTOTYPES =================
 vec3 GetDiffuseColor();
 vec3 GetSpecularColor();
@@ -101,7 +120,16 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 // ================= MAIN =================
 void main()
 {
-    vec3 norm = normalize(Normal);
+    vec3 norm;
+    if (u_useNormalMap)
+    {
+        vec3 normalMap = texture(u_normalMap, TexCoord).rgb;
+        normalMap = normalMap * 2.0 - 1.0; // [0,1] → [-1,1]
+        norm = normalize(TBN * normalMap);
+    }
+    else
+        norm = normalize(TBN[2]); // world-space normal
+
     vec3 viewDir = normalize(viewPos - FragPos);
 
     vec3 result = vec3(0.0);

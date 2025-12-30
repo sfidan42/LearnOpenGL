@@ -41,7 +41,7 @@ int main()
 	}
 
 	const vector tilesTransforms = {
-		TransformComponent{vec3(0.0f, -1.5f, 0.0f), vec3(0.0f), vec3(0.5f)}
+		TransformComponent{vec3(0.0f, -1.0f, 0.0f), vec3(0.0f), vec3(0.5f)}
 	};
 
 	for (const TransformComponent& transform : backpackTransforms)
