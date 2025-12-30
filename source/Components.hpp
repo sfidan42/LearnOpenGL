@@ -31,3 +31,5 @@ struct ModelComponent
 	Model model;
 	std::vector<entt::entity> instances;
 };
+
+void setupInstanceTracking(entt::registry& registry);

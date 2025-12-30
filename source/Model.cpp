@@ -48,17 +48,18 @@ void Mesh::setup(const vector<Vertex>& vertices, const vector<Index>& indices,
 
 void Mesh::drawInstanced(const Shader& shader, const vector<mat4>& matrices) const
 {
+	const int instanceCount = static_cast<int>(matrices.size());
+	const int indexCount = static_cast<int>(indices.size());
+
 	// Upload the gathered matrices to the instanceVBO
 	glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-	glBufferData(GL_ARRAY_BUFFER, matrices.size() * sizeof(mat4), matrices.data(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, instanceCount * sizeof(mat4), matrices.data(), GL_DYNAMIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	bind(shader);
 
-	int instanceCount = static_cast<int>(matrices.size());
-
 	glBindVertexArray(VAO);
-	glDrawElementsInstanced(GL_TRIANGLES, static_cast<int>(indices.size()), GL_UNSIGNED_INT, 0, instanceCount);
+	glDrawElementsInstanced(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr, instanceCount);
 	glBindVertexArray(0);
 }
 
