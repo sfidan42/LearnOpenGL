@@ -50,11 +50,10 @@ int main()
 	for (const TransformComponent& transform : tilesTransforms)
 		renderer.loadModel("interior_tiles_1k.glb", transform);
 
-	renderer.lightManager->createPointLight(
+	PointLight pLight = renderer.lightManager->createPointLight(
 		vec3(8.0f, 1.0f, 8.0f), // position
 		vec3(1.0f, 1.0f, 1.0f) // color
 	);
-
 
 	// Spotlights around center, pointing to floor center
 	constexpr auto center = vec3(0.0f, -1.0f, 0.0f); // Floor center
@@ -76,6 +75,10 @@ int main()
 			spotColors[i]
 		);
 	}
+
+	pLight.lightData.diffuse.r = 0.0f;
+	pLight.lightData.specular.r = 0.0f;
+	renderer.lightManager->syncPointLight(pLight);
 
 	renderer.run();
 

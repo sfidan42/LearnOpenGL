@@ -74,50 +74,65 @@ void LightManager::update(const float deltaTime, const Shader& mainShader, const
 	sendSunLight(mainShader, skyShader);
 }
 
-PointLightGPU& LightManager::createPointLight(const vec3& position, const vec3& color)
+PointLight LightManager::createPointLight(const vec3& position, const vec3& color)
 {
-	entt::entity entity = lightRegistry.create();
-	PointLightGPU light{};
-	light.position = position;
-	light.constant = 1.0f;
-	light.ambient = color * 0.1f;
-	light.linear = 0.09f;
-	light.diffuse = color;
-	light.quadratic = 0.032f;
-	light.specular = color;
-	light._pad = 0.0f;
-	// Emplace fully initialized light - callback will have valid data
-	return lightRegistry.emplace<PointLightGPU>(entity, light);
+	PointLightComponent lightComp{};
+	lightComp.position = position;
+	lightComp.constant = 1.0f;
+	lightComp.ambient = color * 0.1f;
+	lightComp.linear = 0.09f;
+	lightComp.diffuse = color;
+	lightComp.quadratic = 0.032f;
+	lightComp.specular = color;
+	lightComp._pad = 0.0f;
+	const entt::entity lightEnt = lightRegistry.create();
+	return {
+		lightEnt,
+		lightRegistry.emplace<PointLightComponent>(lightEnt, lightComp)
+	};
 }
 
-SpotLightGPU& LightManager::createSpotLight(const vec3& position, const vec3& direction, const vec3& color)
+SpotLight LightManager::createSpotLight(const vec3& position, const vec3& direction, const vec3& color)
 {
-	SpotLightGPU sLight{
-		position,
-		cos(radians(12.5f)),
-		normalize(direction),
-		cos(radians(15.0f)),
-		color * 0.1f,
-		1.0f,
-		color,
-		0.09f,
-		color,
-		0.032f
+	SpotLightComponent lightComp{};
+	lightComp.position = position;
+	lightComp.cutOff = glm::cos(glm::radians(12.5f));
+	lightComp.direction = direction;
+	lightComp.outerCutOff = glm::cos(glm::radians(17.5f));
+	lightComp.ambient = color * 0.1f;
+	lightComp.constant = 1.0f;
+	lightComp.diffuse = color;
+	lightComp.linear = 0.09f;
+	lightComp.specular = color;
+	lightComp.quadratic = 0.032f;
+	const entt::entity lightEnt = lightRegistry.create();
+	return {
+		lightEnt,
+		lightRegistry.emplace<SpotLightComponent>(lightEnt, lightComp)
 	};
-	return lightRegistry.emplace<SpotLightGPU>(lightRegistry.create(), sLight);
+}
+
+void LightManager::syncPointLight(const PointLight& light)
+{
+	lightRegistry.patch<PointLightComponent>(light.lightEntity);
+}
+
+void LightManager::syncSpotLight(const SpotLight& light)
+{
+	lightRegistry.patch<SpotLightComponent>(light.lightEntity);
 }
 
 void LightManager::setupLightTracking()
 {
 	// Point Lights
-	lightRegistry.on_construct<PointLightGPU>().connect<&LightManager::onLightUpdate>(this);
-	lightRegistry.on_update<PointLightGPU>().connect<&LightManager::onLightUpdate>(this);
-	lightRegistry.on_destroy<PointLightGPU>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_construct<PointLightComponent>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_update<PointLightComponent>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_destroy<PointLightComponent>().connect<&LightManager::onLightUpdate>(this);
 
 	// Spot Lights
-	lightRegistry.on_construct<SpotLightGPU>().connect<&LightManager::onLightUpdate>(this);
-	lightRegistry.on_update<SpotLightGPU>().connect<&LightManager::onLightUpdate>(this);
-	lightRegistry.on_destroy<SpotLightGPU>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_construct<SpotLightComponent>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_update<SpotLightComponent>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_destroy<SpotLightComponent>().connect<&LightManager::onLightUpdate>(this);
 }
 
 void LightManager::onLightUpdate(entt::registry& registry, entt::entity entity) const
@@ -129,18 +144,18 @@ void LightManager::onLightUpdate(entt::registry& registry, entt::entity entity) 
 
 void LightManager::sendPointLights(const Shader& mainShader) const
 {
-	const uint32_t pLightsCount = lightRegistry.view<PointLightGPU>().size();
+	const uint32_t pLightsCount = lightRegistry.view<PointLightComponent>().size();
 	mainShader.setInt("u_numPointLights", pLightsCount);
 
-	vector<PointLightGPU> pointLights;
+	vector<PointLightComponent> pointLights;
 	pointLights.reserve(pLightsCount);
-	const auto& pLightView = lightRegistry.view<PointLightGPU>();
-	pLightView.each([&](const PointLightGPU& light) { pointLights.push_back(light); });
+	const auto& pLightView = lightRegistry.view<PointLightComponent>();
+	pLightView.each([&](const PointLightComponent& light) { pointLights.push_back(light); });
 
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
 	glBufferData(
 		GL_SHADER_STORAGE_BUFFER,
-		pLightsCount * sizeof(PointLightGPU),
+		pLightsCount * sizeof(PointLightComponent),
 		pointLights.data(),
 		GL_DYNAMIC_DRAW
 	);
@@ -149,18 +164,18 @@ void LightManager::sendPointLights(const Shader& mainShader) const
 
 void LightManager::sendSpotLights(const Shader& mainShader) const
 {
-	const uint32_t sLightsCount = lightRegistry.view<SpotLightGPU>().size();
+	const uint32_t sLightsCount = lightRegistry.view<SpotLightComponent>().size();
 	mainShader.setInt("u_numSpotLights", sLightsCount);
 
-	vector<SpotLightGPU> spotLights;
+	vector<SpotLightComponent> spotLights;
 	spotLights.reserve(sLightsCount);
-	const auto& sLightView = lightRegistry.view<SpotLightGPU>();
-	sLightView.each([&](const SpotLightGPU& light) { spotLights.push_back(light); });
+	const auto& sLightView = lightRegistry.view<SpotLightComponent>();
+	sLightView.each([&](const SpotLightComponent& light) { spotLights.push_back(light); });
 
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, spotLightSSBO);
 	glBufferData(
 		GL_SHADER_STORAGE_BUFFER,
-		sLightsCount * sizeof(SpotLightGPU),
+		sLightsCount * sizeof(SpotLightComponent),
 		spotLights.data(),
 		GL_DYNAMIC_DRAW
 	);
