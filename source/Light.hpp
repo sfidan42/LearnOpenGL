@@ -41,6 +41,9 @@ public:
 	void syncPointLight(const PointLight& light);
 	void syncSpotLight(const SpotLight& light);
 
+	void deletePointLight(const PointLight& light);
+	void deleteSpotLight(const SpotLight& light);
+
 private:
 	DirLightGPU sunLight{};
 

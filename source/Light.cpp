@@ -122,6 +122,16 @@ void LightManager::syncSpotLight(const SpotLight& light)
 	lightRegistry.patch<SpotLightComponent>(light.lightEntity);
 }
 
+void LightManager::deletePointLight(const PointLight& light)
+{
+	lightRegistry.destroy(light.lightEntity);
+}
+
+void LightManager::deleteSpotLight(const SpotLight& light)
+{
+	lightRegistry.destroy(light.lightEntity);
+}
+
 void LightManager::setupLightTracking()
 {
 	// Point Lights

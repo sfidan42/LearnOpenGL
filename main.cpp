@@ -69,11 +69,13 @@ int main()
 	};
 	for(int i = 0; i < 3; ++i)
 	{
-		renderer.lightManager->createSpotLight(
+		SpotLight sLight = renderer.lightManager->createSpotLight(
 			spotPositions[i],
 			normalize(center - spotPositions[i]),
 			spotColors[i]
 		);
+		if (i == 2)
+			renderer.lightManager->deleteSpotLight(sLight);
 	}
 
 	pLight.lightData.diffuse.r = 0.0f;
