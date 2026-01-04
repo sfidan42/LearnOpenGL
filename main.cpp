@@ -2,6 +2,7 @@
 #include <glm/ext.hpp>
 
 #include "callbacks.hpp"
+#include "stb_image.h"
 
 int main()
 {
@@ -49,6 +50,15 @@ int main()
 
 	for (const TransformComponent& transform : tilesTransforms)
 		renderer.loadModel("interior_tiles_1k.glb", transform);
+
+	TransformComponent vechileTransform{
+		.position = vec3(10.0f, -1.0f, 15.0f),
+		.rotation = vec3(0.0f, glm::radians(180.0f), 0.0f),
+		.scale    = vec3(0.5f)
+	};
+
+	stbi_set_flip_vertically_on_load(false);
+	renderer.loadModel("low_poly_vehicle_mini_pack_4.3.glb", vechileTransform);
 
 	PointLight pLight = renderer.lightManager->createPointLight(
 		vec3(8.0f, 1.0f, 8.0f), // position

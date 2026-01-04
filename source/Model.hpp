@@ -13,8 +13,20 @@ struct TextureComponent;
 class Mesh
 {
 public:
+	Mesh() = default;
+	~Mesh();
+
+	// Delete copy operations to prevent double-free of OpenGL resources
+	Mesh(const Mesh&) = delete;
+	Mesh& operator=(const Mesh&) = delete;
+
+	// Allow move operations
+	Mesh(Mesh&& other) noexcept;
+	Mesh& operator=(Mesh&& other) noexcept;
+
 	void setup(const vector<Vertex>& vertices, const vector<Index>& indices, const vector<TextureComponent>& textures);
 	void drawInstanced(const Shader& shader, const vector<mat4>& matrices) const;
+	void cleanup();
 
 private:
 	void bind(const Shader& shader) const;
@@ -24,16 +36,24 @@ private:
 	vector<TextureComponent> textures;
 	GLuint VAO{}, VBO{}, EBO{};
 	GLuint instanceVBO{};
+
+	// Bindless texture SSBOs
+	GLuint diffuseHandlesSSBO{};
+	GLuint specularHandlesSSBO{};
+	GLuint normalHandlesSSBO{};
+	std::vector<GLuint64> diffuseHandles;
+	std::vector<GLuint64> specularHandles;
+	std::vector<GLuint64> normalHandles;
 };
 
 bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID);
-GLuint TextureFromFile(const string& fullPath);
+GLuint TextureFromFile(const string& fullPath, GLuint64& outHandle);
 
 class Model
 {
 public:
 	explicit Model(const string& modelPath);
-	~Model() = default;
+	~Model();
 
 	// Delete copy constructor and copy assignment operator
 	Model(const Model&) = delete;

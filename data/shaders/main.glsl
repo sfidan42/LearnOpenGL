@@ -37,6 +37,9 @@ void main()
 #shader fragment
 #version 460 core
 
+// ================= BINDLESS TEXTURES EXTENSION =================
+#extension GL_ARB_bindless_texture : require
+
 // ================= INPUTS =================
 in vec3 FragPos;
 in vec2 TexCoord;
@@ -44,12 +47,23 @@ in mat3 TBN;
 
 out vec4 FragColor;
 
-// ================= TEXTURE ARRAYS =================
-uniform sampler2D u_diffuseTextures[8];
-uniform int u_numDiffuseTextures;
+// ================= BINDLESS TEXTURE HANDLES =================
+// Texture handles stored in SSBOs for unlimited textures
+layout(std430, binding = 2) buffer DiffuseTextureHandles {
+    sampler2D diffuseTextures[];
+};
 
-uniform sampler2D u_specularTextures[8];
+layout(std430, binding = 3) buffer SpecularTextureHandles {
+    sampler2D specularTextures[];
+};
+
+layout(std430, binding = 4) buffer NormalTextureHandles {
+    sampler2D normalTextures[];
+};
+
+uniform int u_numDiffuseTextures;
 uniform int u_numSpecularTextures;
+uniform int u_numNormalTextures;
 
 float shininess = 32;
 
@@ -104,12 +118,8 @@ uniform int u_numSpotLights;
 
 uniform vec3 viewPos;
 
-// ================= TANGENT SPACE NORMAL MAP =================
-
-uniform sampler2D u_normalMap;
-uniform bool u_useNormalMap;
-
 // ================= FUNCTION PROTOTYPES =================
+vec3 GetNormal();
 vec3 GetDiffuseColor();
 vec3 GetSpecularColor();
 
@@ -120,16 +130,7 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 // ================= MAIN =================
 void main()
 {
-    vec3 norm;
-    if (u_useNormalMap)
-    {
-        vec3 normalMap = texture(u_normalMap, TexCoord).rgb;
-        normalMap = normalMap * 2.0 - 1.0; // [0,1] → [-1,1]
-        norm = normalize(TBN * normalMap);
-    }
-    else
-        norm = normalize(TBN[2]); // world-space normal
-
+    vec3 norm = GetNormal();
     vec3 viewDir = normalize(viewPos - FragPos);
 
     vec3 result = vec3(0.0);
@@ -150,6 +151,22 @@ void main()
 
 // ================= MATERIAL HELPERS =================
 
+vec3 GetNormal()
+{
+    if (u_numNormalTextures <= 0)
+        return normalize(TBN[2]); // world-space normal from vertex shader
+
+    // Sample and average all normal maps (typically there's only one)
+    vec3 normalMap = vec3(0.0);
+    for (int i = 0; i < u_numNormalTextures; i++)
+        normalMap += texture(normalTextures[i], TexCoord).rgb;
+
+    normalMap /= float(u_numNormalTextures);
+    normalMap = normalMap * 2.0 - 1.0; // [0,1] → [-1,1]
+
+    return normalize(TBN * normalMap);
+}
+
 vec3 GetDiffuseColor()
 {
     if (u_numDiffuseTextures <= 0)
@@ -157,7 +174,7 @@ vec3 GetDiffuseColor()
 
     vec3 color = vec3(0.0);
     for (int i = 0; i < u_numDiffuseTextures; i++)
-        color += texture(u_diffuseTextures[i], TexCoord).rgb;
+        color += texture(diffuseTextures[i], TexCoord).rgb;
 
     return color / float(u_numDiffuseTextures);
 }
@@ -169,7 +186,7 @@ vec3 GetSpecularColor()
 
     vec3 color = vec3(0.0);
     for (int i = 0; i < u_numSpecularTextures; i++)
-        color += texture(u_specularTextures[i], TexCoord).rgb;
+        color += texture(specularTextures[i], TexCoord).rgb;
 
     return color / float(u_numSpecularTextures);
 }

@@ -20,6 +20,10 @@ void onInstanceRemoved(entt::registry& registry, entt::entity instanceEnt)
 	if(!registry.valid(inst.modelEntity))
 		return;
 
+	// Check if the ModelComponent still exists before accessing it
+	if(!registry.all_of<ModelComponent>(inst.modelEntity))
+		return;
+
 	auto& instances = registry.get<ModelComponent>(inst.modelEntity).instances;
 
 	erase(instances, instanceEnt);

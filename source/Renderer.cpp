@@ -10,6 +10,7 @@
 Renderer::~Renderer()
 {
 	// destroy these first, because they use OpenGL context
+	modelRegistry.clear();
 	delete lightManager;
 	delete mainShader;
 	delete skyboxShader;

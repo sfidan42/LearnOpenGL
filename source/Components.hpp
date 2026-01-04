@@ -16,6 +16,7 @@ struct TransformComponent
 struct TextureComponent
 {
 	GLuint id;
+	GLuint64 handle;  // Bindless texture handle
 	string type;
 	string path;
 };
@@ -35,28 +36,19 @@ struct ModelComponent
 
 struct PointLightComponent
 {
-	vec3 position;
-	float constant;    // Row 1: 16 bytes
-	vec3 ambient;
-	float linear;      // Row 2: 16 bytes
-	vec3 diffuse;
-	float quadratic;   // Row 3: 16 bytes
-	vec3 specular;
-	float _pad;        // Row 4: 16 bytes
+	vec3 position;	float constant;    // Row 1: 16 bytes
+	vec3 ambient;	float linear;      // Row 2: 16 bytes
+	vec3 diffuse;	float quadratic;   // Row 3: 16 bytes
+	vec3 specular;	float _pad;        // Row 4: 16 bytes
 }; // Total 64 bytes
 
 struct SpotLightComponent
 {
-	vec3 position;
-	float cutOff;      // Row 1
-	vec3 direction;
-	float outerCutOff; // Row 2
-	vec3 ambient;
-	float constant;    // Row 3
-	vec3 diffuse;
-	float linear;      // Row 4
-	vec3 specular;
-	float quadratic;   // Row 5
+	vec3 position;	float cutOff;      // Row 1
+	vec3 direction;	float outerCutOff; // Row 2
+	vec3 ambient;	float constant;    // Row 3
+	vec3 diffuse;	float linear;      // Row 4
+	vec3 specular;	float quadratic;   // Row 5
 }; // Total 80 bytes
 
 struct PointLight
