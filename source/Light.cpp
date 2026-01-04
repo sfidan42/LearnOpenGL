@@ -1,9 +1,17 @@
 #include "Light.hpp"
+
 #include <vector>
 #include <glm/glm.hpp>
 
-LightManager::LightManager()
+LightManager::LightManager(const Shader& mainShader, const Shader& skyShader)
+: cachedMainShader(mainShader)
 {
+	// Create SSBOs for dynamic lights
+	glGenBuffers(1, &pointLightSSBO);
+	glGenBuffers(1, &spotLightSSBO);
+
+	setupLightTracking();
+
 	// Dawn: Sun is rising from the east, low angle
 	// A Y-value close to 0.0 puts it on the horizon.
 	sunLight.direction = vec3(-1.0f, -0.5f, 0.0f);
@@ -14,54 +22,7 @@ LightManager::LightManager()
 	// Soft yellowish specular highlights
 	sunLight.specular = vec3(0.8f, 0.7f, 0.3f);
 
-	pointLights.reserve(8);
-	spotLights.reserve(8);
-
-	// Point light in corner
-	PointLightGPU pointLight{
-		vec3(8.0f, 1.0f, 8.0f), // position
-		1.0f, // constant
-		vec3(0.3f, 0.3f, 0.3f), // ambient
-		0.09f, // linear
-		vec3(1.0f, 1.0f, 1.0f), // diffuse
-		0.032f, // quadratic
-		vec3(1.0f, 1.0f, 1.0f), // specular
-		0.0f // padding
-	};
-	pointLights.push_back(pointLight);
-
-	// Spotlights around center, pointing to floor center
-	constexpr auto center = vec3(0.0f, -1.0f, 0.0f); // Floor center
-	constexpr vec3 spotPositions[] = {
-		vec3(-10.0f, 2.0f, -10.0f),
-		vec3(-10.0f, 2.0f, 10.0f),
-		vec3(10.0f, 2.0f, -10.0f)
-	};
-	constexpr vec3 spotColors[] = {
-		vec3(1.0f, 0.0f, 0.0f), // Red
-		vec3(0.0f, 1.0f, 0.0f), // Green
-		vec3(0.0f, 0.0f, 1.0f) // Blue
-	};
-	for(int i = 0; i < 3; ++i)
-	{
-		SpotLightGPU spotLight{
-			spotPositions[i],
-			cos(radians(12.5f)), // cutOff
-			normalize(center - spotPositions[i]),
-			cos(radians(15.0f)), // outerCutOff
-			spotColors[i] * 0.1f, // ambient
-			1.0f, // constant
-			spotColors[i], // diffuse
-			0.09f, // linear
-			spotColors[i], // specular
-			0.032f // quadratic
-		};
-		spotLights.push_back(spotLight);
-	}
-
-	// Create SSBOs for dynamic lights
-	glGenBuffers(1, &pointLightSSBO);
-	glGenBuffers(1, &spotLightSSBO);
+	sendSunLight(mainShader, skyShader);
 }
 
 LightManager::~LightManager()
@@ -72,7 +33,7 @@ LightManager::~LightManager()
 		glDeleteBuffers(1, &spotLightSSBO);
 }
 
-void LightManager::update(const float deltaTime)
+void LightManager::update(const float deltaTime, const Shader& mainShader, const Shader& skyShader)
 {
 	// Adjust speed as needed (e.g., 0.1f for a slow cycle)
 	timeOfDay += deltaTime * 0.2f;
@@ -109,9 +70,106 @@ void LightManager::update(const float deltaTime)
 		sunLight.ambient = vec3(0.02f, 0.02f, 0.05f);
 		sunLight.specular = vec3(0.0f);
 	}
+
+	sendSunLight(mainShader, skyShader);
 }
 
-void LightManager::send(const Shader& mainShader, const Shader& skyShader) const
+PointLightGPU& LightManager::createPointLight(const vec3& position, const vec3& color)
+{
+	entt::entity entity = lightRegistry.create();
+	PointLightGPU light{};
+	light.position = position;
+	light.constant = 1.0f;
+	light.ambient = color * 0.1f;
+	light.linear = 0.09f;
+	light.diffuse = color;
+	light.quadratic = 0.032f;
+	light.specular = color;
+	light._pad = 0.0f;
+	// Emplace fully initialized light - callback will have valid data
+	return lightRegistry.emplace<PointLightGPU>(entity, light);
+}
+
+SpotLightGPU& LightManager::createSpotLight(const vec3& position, const vec3& direction, const vec3& color)
+{
+	SpotLightGPU sLight{
+		position,
+		cos(radians(12.5f)),
+		normalize(direction),
+		cos(radians(15.0f)),
+		color * 0.1f,
+		1.0f,
+		color,
+		0.09f,
+		color,
+		0.032f
+	};
+	return lightRegistry.emplace<SpotLightGPU>(lightRegistry.create(), sLight);
+}
+
+void LightManager::setupLightTracking()
+{
+	// Point Lights
+	lightRegistry.on_construct<PointLightGPU>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_update<PointLightGPU>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_destroy<PointLightGPU>().connect<&LightManager::onLightUpdate>(this);
+
+	// Spot Lights
+	lightRegistry.on_construct<SpotLightGPU>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_update<SpotLightGPU>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_destroy<SpotLightGPU>().connect<&LightManager::onLightUpdate>(this);
+}
+
+void LightManager::onLightUpdate(entt::registry& registry, entt::entity entity) const
+{
+	cachedMainShader.use();
+	sendPointLights(cachedMainShader);
+	sendSpotLights(cachedMainShader);
+}
+
+void LightManager::sendPointLights(const Shader& mainShader) const
+{
+	const uint32_t pLightsCount = lightRegistry.view<PointLightGPU>().size();
+	mainShader.setInt("u_numPointLights", pLightsCount);
+
+	vector<PointLightGPU> pointLights;
+	pointLights.reserve(pLightsCount);
+	const auto& pLightView = lightRegistry.view<PointLightGPU>();
+	pLightView.each([&](const PointLightGPU& light) { pointLights.push_back(light); });
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
+	glBufferData(
+		GL_SHADER_STORAGE_BUFFER,
+		pLightsCount * sizeof(PointLightGPU),
+		pointLights.data(),
+		GL_DYNAMIC_DRAW
+	);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, pointLightSSBO);
+}
+
+void LightManager::sendSpotLights(const Shader& mainShader) const
+{
+	const uint32_t sLightsCount = lightRegistry.view<SpotLightGPU>().size();
+	mainShader.setInt("u_numSpotLights", sLightsCount);
+
+	vector<SpotLightGPU> spotLights;
+	spotLights.reserve(sLightsCount);
+	const auto& sLightView = lightRegistry.view<SpotLightGPU>();
+	sLightView.each([&](const SpotLightGPU& light) { spotLights.push_back(light); });
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, spotLightSSBO);
+	glBufferData(
+		GL_SHADER_STORAGE_BUFFER,
+		sLightsCount * sizeof(SpotLightGPU),
+		spotLights.data(),
+		GL_DYNAMIC_DRAW
+	);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, spotLightSSBO);
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+void LightManager::sendSunLight(const Shader& mainShader, const Shader& skyShader) const
 {
 	mainShader.use();
 
@@ -121,39 +179,10 @@ void LightManager::send(const Shader& mainShader, const Shader& skyShader) const
 	mainShader.setVec3("sunLight.diffuse", sunLight.diffuse);
 	mainShader.setVec3("sunLight.specular", sunLight.specular);
 
-	// Update and bind SSBOs
-	updateSSBOs();
-
-	mainShader.setInt("u_numPointLights", pointLights.size());
-	mainShader.setInt("u_numSpotLights", spotLights.size());
-
 	skyShader.use();
 
 	skyShader.setVec3("sunLight.direction", sunLight.direction);
 	skyShader.setVec3("sunLight.ambient", sunLight.ambient);
 	skyShader.setVec3("sunLight.diffuse", sunLight.diffuse);
 	skyShader.setVec3("sunLight.specular", sunLight.specular);
-}
-
-void LightManager::updateSSBOs() const
-{
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
-	glBufferData(
-		GL_SHADER_STORAGE_BUFFER,
-		pointLights.size() * sizeof(PointLightGPU),
-		pointLights.data(),
-		GL_DYNAMIC_DRAW
-	);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, pointLightSSBO);
-
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, spotLightSSBO);
-	glBufferData(
-		GL_SHADER_STORAGE_BUFFER,
-		spotLights.size() * sizeof(SpotLightGPU),
-		spotLights.data(),
-		GL_DYNAMIC_DRAW
-	);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, spotLightSSBO);
-
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }

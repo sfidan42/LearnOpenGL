@@ -50,6 +50,33 @@ int main()
 	for (const TransformComponent& transform : tilesTransforms)
 		renderer.loadModel("interior_tiles_1k.glb", transform);
 
+	renderer.lightManager->createPointLight(
+		vec3(8.0f, 1.0f, 8.0f), // position
+		vec3(1.0f, 1.0f, 1.0f) // color
+	);
+
+
+	// Spotlights around center, pointing to floor center
+	constexpr auto center = vec3(0.0f, -1.0f, 0.0f); // Floor center
+	constexpr vec3 spotPositions[] = {
+		vec3(-10.0f, 2.0f, -10.0f),
+		vec3(-10.0f, 2.0f, 10.0f),
+		vec3(10.0f, 2.0f, -10.0f)
+	};
+	constexpr vec3 spotColors[] = {
+		vec3(1.0f, 0.0f, 0.0f), // Red
+		vec3(0.0f, 1.0f, 0.0f), // Green
+		vec3(0.0f, 0.0f, 1.0f) // Blue
+	};
+	for(int i = 0; i < 3; ++i)
+	{
+		renderer.lightManager->createSpotLight(
+			spotPositions[i],
+			normalize(center - spotPositions[i]),
+			spotColors[i]
+		);
+	}
+
 	renderer.run();
 
 	return 0;

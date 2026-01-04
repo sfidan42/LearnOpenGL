@@ -108,7 +108,7 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 
 	setupInstanceTracking(modelRegistry);
 
-	lightManager = new LightManager();
+	lightManager = new LightManager(*mainShader, *skyboxShader);
 
 	return true;
 }
@@ -128,8 +128,7 @@ void Renderer::run()
 		const float deltaTime = currentTime - lastTime;
 		lastTime = currentTime;
 
-		lightManager->update(deltaTime);
-		lightManager->send(*mainShader, *skyboxShader);
+		lightManager->update(deltaTime, *mainShader, *skyboxShader);
 
 		g_camera.update(deltaTime);
 		g_camera.send(*mainShader, *skyboxShader);

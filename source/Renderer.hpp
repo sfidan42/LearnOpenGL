@@ -17,11 +17,12 @@ public:
 
 	void loadModel(const string& modelPath, const TransformComponent& transform);
 
+	LightManager* lightManager = nullptr;
+
 private:
 	GLFWwindow* window = nullptr;
 	Shader* mainShader = nullptr;
 	Shader* skyboxShader = nullptr;
 	Skybox* skybox = nullptr;
 	entt::registry modelRegistry;
-	LightManager* lightManager = nullptr;
 };

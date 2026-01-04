@@ -6,50 +6,80 @@
 
 using namespace glm;
 
-struct alignas(16) DirLightGPU
+struct DirLightGPU
 {
-	vec3 direction; float _pad0;
-	vec3 ambient;   float _pad1;
-	vec3 diffuse;   float _pad2;
-	vec3 specular;  float _pad3;
+	vec3 direction;
+	float _pad0;
+	vec3 ambient;
+	float _pad1;
+	vec3 diffuse;
+	float _pad2;
+	vec3 specular;
+	float _pad3;
 };
 
-struct alignas(16) PointLightGPU
+struct PointLightGPU
 {
-	vec3 position; float constant;
-	vec3 ambient;  float linear;
-	vec3 diffuse;  float quadratic;
-	vec3 specular; float _pad;
-};
+	vec3 position;
+	float constant;    // Row 1: 16 bytes
+	vec3 ambient;
+	float linear;      // Row 2: 16 bytes
+	vec3 diffuse;
+	float quadratic;   // Row 3: 16 bytes
+	vec3 specular;
+	float _pad;        // Row 4: 16 bytes
+}; // Total 64 bytes
 
-struct alignas(16) SpotLightGPU
+struct SpotLightGPU
 {
-	vec3 position;  float cutOff;
-	vec3 direction; float outerCutOff;
-	vec3 ambient;   float constant;
-	vec3 diffuse;   float linear;
-	vec3 specular;  float quadratic;
-};
+	vec3 position;
+	float cutOff;      // Row 1
+	vec3 direction;
+	float outerCutOff; // Row 2
+	vec3 ambient;
+	float constant;    // Row 3
+	vec3 diffuse;
+	float linear;      // Row 4
+	vec3 specular;
+	float quadratic;   // Row 5
+}; // Total 80 bytes
 
 class LightManager
 {
 public:
-	LightManager();
+	LightManager(const Shader& mainShader, const Shader& skyShader);
 	~LightManager();
 
-	void update(float deltaTime);
-	void send(const Shader& mainShader, const Shader& skyShader) const;
+	void update(float deltaTime, const Shader& mainShader, const Shader& skyShader);
+
+	PointLightGPU& createPointLight(
+		const vec3& position,
+		const vec3& color
+	);
+
+	SpotLightGPU& createSpotLight(
+		const vec3& position,
+		const vec3& direction,
+		const vec3& color
+	);
 
 private:
 	DirLightGPU sunLight{};
 
-	vector<PointLightGPU> pointLights;
-	vector<SpotLightGPU> spotLights;
+	entt::registry lightRegistry;
 
 	GLuint pointLightSSBO = 0;
-	GLuint spotLightSSBO  = 0;
+	GLuint spotLightSSBO = 0;
 
 	float timeOfDay = 0.0f;
 
-	void updateSSBOs() const;
+	const Shader& cachedMainShader;
+
+	void setupLightTracking();
+	void onLightUpdate(entt::registry& registry, entt::entity entity) const;
+	void sendPointLights(const Shader& mainShader) const;
+	void sendSpotLights(const Shader& mainShader) const;
+	void sendSunLight(const Shader& mainShader, const Shader& skyShader) const;
 };
+
+void setupLightTracking(LightManager& lManager, entt::registry& registry, const Shader& mainShader);
