@@ -23,5 +23,5 @@ private:
 	Shader* skyboxShader = nullptr;
 	Skybox* skybox = nullptr;
 	entt::registry modelRegistry;
-	LightManager lightManager;
+	LightManager* lightManager = nullptr;
 };

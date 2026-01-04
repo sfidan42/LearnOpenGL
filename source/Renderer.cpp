@@ -10,6 +10,7 @@
 Renderer::~Renderer()
 {
 	// destroy these first, because they use OpenGL context
+	delete lightManager;
 	delete mainShader;
 	delete skyboxShader;
 	delete skybox;
@@ -17,9 +18,11 @@ Renderer::~Renderer()
 		glfwDestroyWindow(window);
 	glfwTerminate();
 }
-
 bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath)
 {
+	setenv("__NV_PRIME_RENDER_OFFLOAD", "1", 1);
+	setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 1);
+
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
@@ -38,12 +41,35 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 	{
 		cout << "Failed to initialize GLAD" << endl;
 		return false;
+	}
+
+	const GLubyte* vendor   = glGetString(GL_VENDOR);
+	const GLubyte* renderer = glGetString(GL_RENDERER);
+	const GLubyte* version  = glGetString(GL_VERSION);
+	const GLubyte* sl       = glGetString(GL_SHADING_LANGUAGE_VERSION);
+
+	std::cout << "OpenGL Vendor   : " << vendor   << '\n';
+	std::cout << "OpenGL Renderer : " << renderer << '\n';
+	std::cout << "OpenGL Version  : " << version  << '\n';
+	std::cout << "GLSL Version    : " << sl       << '\n';
+
+	const vector extensions = {
+		GLAD_GL_ARB_bindless_texture
+	};
+
+	for (const auto& ext : extensions)
+	{
+		if(!ext)
+		{
+			cout << "Missing required OpenGL extension" << endl;
+			return false;
+		}
 	}
 
 	glEnable(GL_DEPTH_TEST);
@@ -88,6 +114,8 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 
 	setupInstanceTracking(modelRegistry);
 
+	lightManager = new LightManager();
+
 	return true;
 }
 
@@ -106,8 +134,8 @@ void Renderer::run()
 		const float deltaTime = currentTime - lastTime;
 		lastTime = currentTime;
 
-		lightManager.update(deltaTime);
-		lightManager.send(*mainShader, *skyboxShader);
+		lightManager->update(deltaTime);
+		lightManager->send(*mainShader, *skyboxShader);
 
 		g_camera.update(deltaTime);
 		g_camera.send(*mainShader, *skyboxShader);
