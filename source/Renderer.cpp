@@ -18,6 +18,7 @@ Renderer::~Renderer()
 		glfwDestroyWindow(window);
 	glfwTerminate();
 }
+
 bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath)
 {
 	setenv("__NV_PRIME_RENDER_OFFLOAD", "1", 1);
@@ -41,7 +42,7 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
-	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 	{
@@ -59,17 +60,10 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	std::cout << "OpenGL Version  : " << version  << '\n';
 	std::cout << "GLSL Version    : " << sl       << '\n';
 
-	const vector extensions = {
-		GLAD_GL_ARB_bindless_texture
-	};
-
-	for (const auto& ext : extensions)
+	if (!GLAD_GL_ARB_bindless_texture)
 	{
-		if(!ext)
-		{
-			cout << "Missing required OpenGL extension" << endl;
-			return false;
-		}
+		cout << "Bindless textures not supported by the GPU/driver" << endl;
+		return false;
 	}
 
 	glEnable(GL_DEPTH_TEST);

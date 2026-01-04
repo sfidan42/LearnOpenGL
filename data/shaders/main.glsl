@@ -66,40 +66,40 @@ struct PointLight
 {
     vec3 position;
     float constant;
-    float linear;
-    float quadratic;
-
     vec3 ambient;
+    float linear;
     vec3 diffuse;
+    float quadratic;
     vec3 specular;
+    float _pad1;
 };
 
 struct SpotLight
 {
     vec3 position;
-    vec3 direction;
-
     float cutOff;
+    vec3 direction;
     float outerCutOff;
-
-    float constant;
-    float linear;
-    float quadratic;
-
     vec3 ambient;
+    float constant;
     vec3 diffuse;
+    float linear;
     vec3 specular;
+    float quadratic;
 };
-
-#define MAX_POINT_LIGHTS 16
-#define MAX_SPOT_LIGHTS 16
 
 uniform DirLight sunLight;
 
-uniform PointLight pointLights[MAX_POINT_LIGHTS];
-uniform int u_numPointLights;
+// SSBOs for dynamic number of lights
+layout(std430, binding = 0) buffer PointLightBuffer {
+    PointLight pointLights[];
+};
 
-uniform SpotLight spotLights[MAX_SPOT_LIGHTS];
+layout(std430, binding = 1) buffer SpotLightBuffer {
+    SpotLight spotLights[];
+};
+
+uniform int u_numPointLights;
 uniform int u_numSpotLights;
 
 uniform vec3 viewPos;
