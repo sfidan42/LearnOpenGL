@@ -14,6 +14,9 @@ LightManager::LightManager()
 	// Soft yellowish specular highlights
 	sunLight.specular = vec3(0.8f, 0.7f, 0.3f);
 
+	pointLights.reserve(8);
+	spotLights.reserve(8);
+
 	// Point light in corner
 	PointLightGPU pointLight{
 		vec3(8.0f, 1.0f, 8.0f), // position
@@ -25,14 +28,14 @@ LightManager::LightManager()
 		vec3(1.0f, 1.0f, 1.0f), // specular
 		0.0f // padding
 	};
-	lightRegistry.emplace<PointLightGPU>(lightRegistry.create(), pointLight);
+	pointLights.push_back(pointLight);
 
 	// Spotlights around center, pointing to floor center
 	constexpr auto center = vec3(0.0f, -1.0f, 0.0f); // Floor center
 	constexpr vec3 spotPositions[] = {
-		vec3(5.0f, 2.0f, 5.0f),
-		vec3(-5.0f, 2.0f, 5.0f),
-		vec3(0.0f, 2.0f, -5.0f)
+		vec3(-10.0f, 2.0f, -10.0f),
+		vec3(-10.0f, 2.0f, 10.0f),
+		vec3(10.0f, 2.0f, -10.0f)
 	};
 	constexpr vec3 spotColors[] = {
 		vec3(1.0f, 0.0f, 0.0f), // Red
@@ -53,7 +56,7 @@ LightManager::LightManager()
 			spotColors[i], // specular
 			0.032f // quadratic
 		};
-		lightRegistry.emplace<SpotLightGPU>(lightRegistry.create(), spotLight);
+		spotLights.push_back(spotLight);
 	}
 
 	// Create SSBOs for dynamic lights
@@ -121,10 +124,8 @@ void LightManager::send(const Shader& mainShader, const Shader& skyShader) const
 	// Update and bind SSBOs
 	updateSSBOs();
 
-	const int pLightCount = static_cast<int>(lightRegistry.view<PointLightGPU>().size());
-	const int sLightCount = static_cast<int>(lightRegistry.view<SpotLightGPU>().size());
-	mainShader.setInt("u_numPointLights", pLightCount);
-	mainShader.setInt("u_numSpotLights", sLightCount);
+	mainShader.setInt("u_numPointLights", pointLights.size());
+	mainShader.setInt("u_numSpotLights", spotLights.size());
 
 	skyShader.use();
 
@@ -136,18 +137,6 @@ void LightManager::send(const Shader& mainShader, const Shader& skyShader) const
 
 void LightManager::updateSSBOs() const
 {
-	auto* pLightStorage = lightRegistry.storage<PointLightGPU>();
-	auto* sLightStorage = lightRegistry.storage<SpotLightGPU>();
-	if (!pLightStorage || !sLightStorage)
-		return;
-
-	vector<PointLightGPU> pointLights;
-	for (const auto& entity : lightRegistry.view<PointLightGPU>())
-		pointLights.push_back(lightRegistry.get<PointLightGPU>(entity));
-	vector<SpotLightGPU> spotLights;
-	for (const auto& entity : lightRegistry.view<SpotLightGPU>())
-		spotLights.push_back(lightRegistry.get<SpotLightGPU>(entity));
-
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
 	glBufferData(
 		GL_SHADER_STORAGE_BUFFER,

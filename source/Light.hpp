@@ -43,7 +43,8 @@ public:
 private:
 	DirLightGPU sunLight{};
 
-	entt::registry lightRegistry;
+	vector<PointLightGPU> pointLights;
+	vector<SpotLightGPU> spotLights;
 
 	GLuint pointLightSSBO = 0;
 	GLuint spotLightSSBO  = 0;
