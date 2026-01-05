@@ -35,9 +35,6 @@ private:
 	Skybox* skybox = nullptr;
 	ShadowMap* shadowMap = nullptr;
 
-	// Shadow maps for dynamic lights
-	std::vector<PointLightShadowMap> pointLightShadowMaps;
-	std::vector<SpotLightShadowMap> spotLightShadowMaps;
 
 	entt::registry modelRegistry;
 

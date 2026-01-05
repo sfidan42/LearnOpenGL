@@ -11,8 +11,6 @@ Renderer::~Renderer()
 {
 	// destroy these first, because they use OpenGL context
 	modelRegistry.clear();
-	pointLightShadowMaps.clear();
-	spotLightShadowMaps.clear();
 	delete lightManager;
 	delete mainShader;
 	delete skyboxShader;
@@ -118,14 +116,6 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	mainShader->use();
 	mainShader->setInt("shadowMap", 5); // Use texture unit 5 for shadow map
 
-	// Initialize point and spot light shadow map uniforms
-	mainShader->setInt("u_numPointShadowMaps", 0);
-	mainShader->setInt("u_numSpotShadowMaps", 0);
-	mainShader->setFloat("pointLightFarPlane", PointLightShadowMap::FAR_PLANE);
-	for (int i = 0; i < MAX_SHADOW_CASTING_POINT_LIGHTS; ++i)
-		mainShader->setInt("pointShadowMaps[" + std::to_string(i) + "]", 6 + i);
-	for (int i = 0; i < MAX_SHADOW_CASTING_SPOT_LIGHTS; ++i)
-		mainShader->setInt("spotShadowMaps[" + std::to_string(i) + "]", 10 + i);
 
 	skybox = new Skybox();
 
@@ -165,6 +155,9 @@ void Renderer::run()
 
 		lightManager->update(deltaTime);
 		g_camera.update(deltaTime);
+
+		// Update light space matrices before shadow rendering
+		lightManager->updateSpotLightMatrices();
 
 		// ========== PASS 1: Shadow Maps ==========
 		renderShadowPass();        // Directional light
@@ -214,12 +207,8 @@ void Renderer::renderShadowPass()
 
 void Renderer::renderPointLightShadows()
 {
-	const auto pointLights = lightManager->getPointLights();
-	const size_t numLights = std::min(pointLights.size(), static_cast<size_t>(MAX_SHADOW_CASTING_POINT_LIGHTS));
-
-	// Ensure we have enough shadow maps
-	while (pointLightShadowMaps.size() < numLights)
-		pointLightShadowMaps.emplace_back(512); // 512x512 for each cubemap face
+	auto shadowMaps = lightManager->getPointLightShadowMaps();
+	if (shadowMaps.empty()) return;
 
 	glCullFace(GL_FRONT);
 	shadowPointShader->use();
@@ -227,24 +216,29 @@ void Renderer::renderPointLightShadows()
 	const float farPlane = PointLightShadowMap::FAR_PLANE;
 	shadowPointShader->setFloat("farPlane", farPlane);
 
-	for (size_t i = 0; i < numLights; ++i)
-	{
-		const auto& light = pointLights[i];
-		auto& shadowMapCube = pointLightShadowMaps[i];
+	// Get point lights to access positions
+	auto& registry = lightManager->getLightRegistry();
+	auto view = registry.view<PointLightComponent>();
 
-		shadowMapCube.bindForWriting();
+	for (auto [entity, light] : view.each())
+	{
+		auto it = shadowMaps.find(entity);
+		if (it == shadowMaps.end()) continue;
+
+		auto* shadowMap = it->second;
+		shadowMap->bindForWriting();
 
 		shadowPointShader->setVec3("lightPos", light.position);
 
 		// Calculate and set the 6 shadow matrices
-		mat4 projection = shadowMapCube.getLightProjectionMatrix(0.1f, farPlane);
+		mat4 projection = shadowMap->getLightProjectionMatrix(0.1f, farPlane);
 		auto viewMatrices = PointLightShadowMap::getLightViewMatrices(light.position);
 
 		for (int face = 0; face < 6; ++face)
 		{
-			mat4 shadowMatrix = projection * viewMatrices[face];
+			mat4 lightShadowMatrix = projection * viewMatrices[face];
 			string uniformName = "shadowMatrices[" + std::to_string(face) + "]";
-			shadowPointShader->setMat4(uniformName, shadowMatrix);
+			shadowPointShader->setMat4(uniformName, lightShadowMatrix);
 		}
 
 		// Render all models
@@ -261,24 +255,25 @@ void Renderer::renderPointLightShadows()
 
 void Renderer::renderSpotLightShadows()
 {
-	const auto spotLights = lightManager->getSpotLights();
-	const size_t numLights = std::min(spotLights.size(), static_cast<size_t>(MAX_SHADOW_CASTING_SPOT_LIGHTS));
-
-	// Ensure we have enough shadow maps
-	while (spotLightShadowMaps.size() < numLights)
-		spotLightShadowMaps.emplace_back(1024, 1024);
+	auto shadowMaps = lightManager->getSpotLightShadowMaps();
+	if (shadowMaps.empty()) return;
 
 	glCullFace(GL_FRONT);
 	shadowMapShader->use();
 
-	for (size_t i = 0; i < numLights; ++i)
+	// Get spot lights to access positions and directions
+	auto& registry = lightManager->getLightRegistry();
+	auto view = registry.view<SpotLightComponent>();
+
+	for (auto [entity, light] : view.each())
 	{
-		const auto& light = spotLights[i];
-		auto& spotShadowMap = spotLightShadowMaps[i];
+		auto it = shadowMaps.find(entity);
+		if (it == shadowMaps.end()) continue;
 
-		spotShadowMap.bindForWriting();
+		auto* spotShadowMap = it->second;
+		spotShadowMap->bindForWriting();
 
-		mat4 lightSpaceMatrix = spotShadowMap.getLightSpaceMatrix(
+		mat4 lightSpaceMatrix = spotShadowMap->getLightSpaceMatrix(
 			light.position,
 			normalize(light.direction),
 			light.outerCutOff,
@@ -312,39 +307,8 @@ void Renderer::renderScene()
 
 	mainShader->use();
 
-	// Bind point light shadow cubemaps (texture units 6-9)
-	const int numPointShadows = static_cast<int>(std::min(pointLightShadowMaps.size(),
-		static_cast<size_t>(MAX_SHADOW_CASTING_POINT_LIGHTS)));
-	mainShader->setInt("u_numPointShadowMaps", numPointShadows);
-	mainShader->setFloat("pointLightFarPlane", PointLightShadowMap::FAR_PLANE);
-
-	for (int i = 0; i < numPointShadows; ++i)
-	{
-		pointLightShadowMaps[i].bindForReading(GL_TEXTURE6 + i);
-		mainShader->setInt("pointShadowMaps[" + std::to_string(i) + "]", 6 + i);
-	}
-
-	// Bind spot light shadow maps (texture units 10-13)
-	const auto spotLights = lightManager->getSpotLights();
-	const int numSpotShadows = static_cast<int>(std::min(spotLightShadowMaps.size(),
-		static_cast<size_t>(MAX_SHADOW_CASTING_SPOT_LIGHTS)));
-	mainShader->setInt("u_numSpotShadowMaps", numSpotShadows);
-
-	for (int i = 0; i < numSpotShadows; ++i)
-	{
-		spotLightShadowMaps[i].bindForReading(GL_TEXTURE10 + i);
-		mainShader->setInt("spotShadowMaps[" + std::to_string(i) + "]", 10 + i);
-
-		// Calculate and send light space matrix
-		const auto& light = spotLights[i];
-		mat4 lightSpaceMatrix = spotLightShadowMaps[i].getLightSpaceMatrix(
-			light.position,
-			normalize(light.direction),
-			light.outerCutOff,
-			0.1f, 50.0f
-		);
-		mainShader->setMat4("spotLightSpaceMatrices[" + std::to_string(i) + "]", lightSpaceMatrix);
-	}
+	// Point and spot light shadow maps are now handled via bindless textures
+	// stored directly in the light SSBOs - no need to bind them here
 
 	const auto modelView = modelRegistry.view<ModelComponent>();
 	modelView.each([&](const ModelComponent& modelComp)

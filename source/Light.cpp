@@ -95,12 +95,19 @@ PointLight LightManager::createPointLight(const vec3& position, const vec3& colo
 	lightComp.diffuse = color;
 	lightComp.quadratic = 0.032f;
 	lightComp.specular = color;
-	lightComp._pad = 0.0f;
+	lightComp.farPlane = PointLightShadowMap::FAR_PLANE;
+	lightComp.shadowMapHandle = 0; // Will be set after shadow map creation
+	lightComp._pad[0] = 0.0f;
+	lightComp._pad[1] = 0.0f;
+
 	const entt::entity lightEnt = lightRegistry.create();
-	return {
-		lightRegistry.emplace<PointLightComponent>(lightEnt, lightComp),
-		lightEnt
-	};
+	auto& comp = lightRegistry.emplace<PointLightComponent>(lightEnt, lightComp);
+
+	// Create shadow map for this light
+	createPointLightShadowMap(lightEnt);
+	comp.shadowMapHandle = pointLightShadowHandles[lightEnt];
+
+	return { comp, lightEnt };
 }
 
 SpotLight LightManager::createSpotLight(const vec3& position, const vec3& direction, const vec3& color)
@@ -116,11 +123,19 @@ SpotLight LightManager::createSpotLight(const vec3& position, const vec3& direct
 	lightComp.linear = 0.09f;
 	lightComp.specular = color;
 	lightComp.quadratic = 0.032f;
+	lightComp.lightSpaceMatrix = mat4(1.0f); // Will be updated during render
+	lightComp.shadowMapHandle = 0; // Will be set after shadow map creation
+	lightComp._pad[0] = 0.0f;
+	lightComp._pad[1] = 0.0f;
+
 	const entt::entity lightEnt = lightRegistry.create();
-	return {
-		lightRegistry.emplace<SpotLightComponent>(lightEnt, lightComp),
-		lightEnt
-	};
+	auto& comp = lightRegistry.emplace<SpotLightComponent>(lightEnt, lightComp);
+
+	// Create shadow map for this light
+	createSpotLightShadowMap(lightEnt);
+	comp.shadowMapHandle = spotLightShadowHandles[lightEnt];
+
+	return { comp, lightEnt };
 }
 
 void LightManager::updatePointLight(const PointLight& light)
@@ -135,12 +150,14 @@ void LightManager::updateSpotLight(const SpotLight& light)
 
 void LightManager::deletePointLight(const PointLight& light)
 {
+	destroyPointLightShadowMap(light.lightEntity);
 	lightRegistry.destroy(light.lightEntity);
 	syncPointLights(lightRegistry, light.lightEntity);
 }
 
 void LightManager::deleteSpotLight(const SpotLight& light)
 {
+	destroySpotLightShadowMap(light.lightEntity);
 	lightRegistry.destroy(light.lightEntity);
 	syncSpotLights(lightRegistry, light.lightEntity);
 }
@@ -232,4 +249,89 @@ std::vector<SpotLightComponent> LightManager::getSpotLights() const
 	lights.reserve(view.size());
 	view.each([&](const SpotLightComponent& light) { lights.push_back(light); });
 	return lights;
+}
+
+void LightManager::createPointLightShadowMap(entt::entity entity)
+{
+	auto shadowMap = std::make_unique<PointLightShadowMap>(512);
+	GLuint64 handle = glGetTextureHandleARB(shadowMap->getDepthCubemap());
+	glMakeTextureHandleResidentARB(handle);
+
+	pointLightShadowMaps[entity] = std::move(shadowMap);
+	pointLightShadowHandles[entity] = handle;
+}
+
+void LightManager::createSpotLightShadowMap(entt::entity entity)
+{
+	auto shadowMap = std::make_unique<SpotLightShadowMap>(1024, 1024);
+	GLuint64 handle = glGetTextureHandleARB(shadowMap->getDepthTexture());
+	glMakeTextureHandleResidentARB(handle);
+
+	spotLightShadowMaps[entity] = std::move(shadowMap);
+	spotLightShadowHandles[entity] = handle;
+}
+
+void LightManager::destroyPointLightShadowMap(entt::entity entity)
+{
+	auto it = pointLightShadowHandles.find(entity);
+	if (it != pointLightShadowHandles.end())
+	{
+		glMakeTextureHandleNonResidentARB(it->second);
+		pointLightShadowHandles.erase(it);
+	}
+	pointLightShadowMaps.erase(entity);
+}
+
+void LightManager::destroySpotLightShadowMap(entt::entity entity)
+{
+	auto it = spotLightShadowHandles.find(entity);
+	if (it != spotLightShadowHandles.end())
+	{
+		glMakeTextureHandleNonResidentARB(it->second);
+		spotLightShadowHandles.erase(it);
+	}
+	spotLightShadowMaps.erase(entity);
+}
+
+std::unordered_map<entt::entity, PointLightShadowMap*> LightManager::getPointLightShadowMaps()
+{
+	std::unordered_map<entt::entity, PointLightShadowMap*> result;
+	for (auto& [entity, shadowMap] : pointLightShadowMaps)
+		result[entity] = shadowMap.get();
+	return result;
+}
+
+std::unordered_map<entt::entity, SpotLightShadowMap*> LightManager::getSpotLightShadowMaps()
+{
+	std::unordered_map<entt::entity, SpotLightShadowMap*> result;
+	for (auto& [entity, shadowMap] : spotLightShadowMaps)
+		result[entity] = shadowMap.get();
+	return result;
+}
+
+void LightManager::updateSpotLightMatrices()
+{
+	auto view = lightRegistry.view<SpotLightComponent>();
+	bool hasLights = false;
+
+	for (auto [entity, light] : view.each())
+	{
+		hasLights = true;
+		auto it = spotLightShadowMaps.find(entity);
+		if (it != spotLightShadowMaps.end())
+		{
+			light.lightSpaceMatrix = it->second->getLightSpaceMatrix(
+				light.position,
+				normalize(light.direction),
+				light.outerCutOff,
+				0.1f, 50.0f
+			);
+		}
+	}
+
+	// Force sync the SSBO so the shader sees the updated matrices
+	if (hasLights)
+	{
+		syncSpotLights(lightRegistry, entt::null);
+	}
 }

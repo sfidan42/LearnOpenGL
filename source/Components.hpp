@@ -47,8 +47,10 @@ struct PointLightComponent
 	vec3 diffuse;
 	float quadratic; // Row 3: 16 bytes
 	vec3 specular;
-	float _pad; // Row 4: 16 bytes
-}; // Total 64 bytes
+	float farPlane; // Row 4: 16 bytes - far plane for shadow calculation
+	uint64_t shadowMapHandle; // Bindless cubemap handle (8 bytes)
+	float _pad[2]; // Padding to 16-byte alignment
+}; // Total 80 bytes
 
 struct SpotLightComponent
 {
@@ -62,7 +64,10 @@ struct SpotLightComponent
 	float linear; // Row 4
 	vec3 specular;
 	float quadratic; // Row 5
-}; // Total 80 bytes
+	mat4 lightSpaceMatrix; // Rows 6-9: 64 bytes
+	uint64_t shadowMapHandle; // Bindless 2D shadow map handle (8 bytes)
+	float _pad[2]; // Padding to 16-byte alignment
+}; // Total 160 bytes
 
 struct DirLightComponent
 {
