@@ -32,3 +32,5 @@ To build and run the code, follow these steps:
     ![ecs model loading](assets/renderer_loadModel.png)
    4. After adding Skybox
     ![skybox](assets/skyboxed.png)
+   5. After adding shadow mapping
+    ![shadow mapping](assets/shadows.png)

@@ -38,7 +38,6 @@ struct ModelComponent
 	void drawInstanced(const Shader& shader) const;
 };
 
-
 struct PointLightComponent
 {
 	vec3 position;

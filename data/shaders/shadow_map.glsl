@@ -16,6 +16,4 @@ void main()
 void main()
 {
     // gl_FragDepth is written automatically
-    // We could write: gl_FragDepth = gl_FragCoord.z;
-    // But OpenGL does this by default
 }

@@ -11,10 +11,13 @@ Renderer::~Renderer()
 {
 	// destroy these first, because they use OpenGL context
 	modelRegistry.clear();
+	pointLightShadowMaps.clear();
+	spotLightShadowMaps.clear();
 	delete lightManager;
 	delete mainShader;
 	delete skyboxShader;
-	delete shadowShader;
+	delete shadowMapShader;
+	delete shadowPointShader;
 	delete skybox;
 	delete shadowMap;
 	if(window)
@@ -22,7 +25,7 @@ Renderer::~Renderer()
 	glfwTerminate();
 }
 
-bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath, const string& shadowShaderPath)
+bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath)
 {
 	setenv("__NV_PRIME_RENDER_OFFLOAD", "1", 1);
 	setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 1);
@@ -92,11 +95,19 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 		return false;
 	}
 
-	// Load shadow shader
-	shadowShader = new Shader();
-	if(!shadowShader->load(shadowShaderPath))
+	// Load shadow map shader
+	shadowMapShader = new Shader();
+	if(!shadowMapShader->load("shaders/shadow_map.glsl"))
 	{
 		cout << "Failed to load shadow shaders" << endl;
+		return false;
+	}
+
+	// Load point light shadow shader (with geometry shader for cubemap)
+	shadowPointShader = new Shader();
+	if(!shadowPointShader->load("shaders/shadow_point.glsl"))
+	{
+		cout << "Failed to load point light shadow shaders" << endl;
 		return false;
 	}
 
@@ -106,6 +117,15 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	// Set shadow map texture unit in main shader
 	mainShader->use();
 	mainShader->setInt("shadowMap", 5); // Use texture unit 5 for shadow map
+
+	// Initialize point and spot light shadow map uniforms
+	mainShader->setInt("u_numPointShadowMaps", 0);
+	mainShader->setInt("u_numSpotShadowMaps", 0);
+	mainShader->setFloat("pointLightFarPlane", PointLightShadowMap::FAR_PLANE);
+	for (int i = 0; i < MAX_SHADOW_CASTING_POINT_LIGHTS; ++i)
+		mainShader->setInt("pointShadowMaps[" + std::to_string(i) + "]", 6 + i);
+	for (int i = 0; i < MAX_SHADOW_CASTING_SPOT_LIGHTS; ++i)
+		mainShader->setInt("spotShadowMaps[" + std::to_string(i) + "]", 10 + i);
 
 	skybox = new Skybox();
 
@@ -146,8 +166,10 @@ void Renderer::run()
 		lightManager->update(deltaTime);
 		g_camera.update(deltaTime);
 
-		// ========== PASS 1: Shadow Map ==========
-		renderShadowPass();
+		// ========== PASS 1: Shadow Maps ==========
+		renderShadowPass();        // Directional light
+		renderPointLightShadows(); // Point lights (cubemaps)
+		renderSpotLightShadows();  // Spot lights (2D)
 
 		// ========== PASS 2: Main Scene ==========
 		renderScene();
@@ -164,29 +186,115 @@ void Renderer::renderShadowPass()
 	// Use front face culling to reduce shadow acne
 	glCullFace(GL_FRONT);
 
-	shadowShader->use();
+	shadowMapShader->use();
 
 	// Calculate light space matrix from sun direction
 	const vec3 sunDir = lightManager->getSunDirection();
-	const mat4 lightSpaceMatrix = shadowMap->getLightSpaceMatrix(sunDir, 30.0f, 0.1f, 100.0f);
-	shadowShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
+	const mat4 lightSpaceMatrix = ShadowMap::getLightSpaceMatrix(sunDir, 30.0f, 0.1f, 100.0f);
+	shadowMapShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
 
 	// Also send to main shader for fragment shader use
 	mainShader->use();
 	mainShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
 
 	// Render all models to shadow map
-	shadowShader->use();
+	shadowMapShader->use();
 	const auto modelView = modelRegistry.view<ModelComponent>();
 	modelView.each([&](const ModelComponent& modelComp)
 	{
-		modelComp.drawInstanced(*shadowShader);
+		modelComp.drawInstanced(*shadowMapShader);
 	});
 
 	// Reset to back face culling
 	glCullFace(GL_BACK);
 
 	// Unbind shadow framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::renderPointLightShadows()
+{
+	const auto pointLights = lightManager->getPointLights();
+	const size_t numLights = std::min(pointLights.size(), static_cast<size_t>(MAX_SHADOW_CASTING_POINT_LIGHTS));
+
+	// Ensure we have enough shadow maps
+	while (pointLightShadowMaps.size() < numLights)
+		pointLightShadowMaps.emplace_back(512); // 512x512 for each cubemap face
+
+	glCullFace(GL_FRONT);
+	shadowPointShader->use();
+
+	const float farPlane = PointLightShadowMap::FAR_PLANE;
+	shadowPointShader->setFloat("farPlane", farPlane);
+
+	for (size_t i = 0; i < numLights; ++i)
+	{
+		const auto& light = pointLights[i];
+		auto& shadowMapCube = pointLightShadowMaps[i];
+
+		shadowMapCube.bindForWriting();
+
+		shadowPointShader->setVec3("lightPos", light.position);
+
+		// Calculate and set the 6 shadow matrices
+		mat4 projection = shadowMapCube.getLightProjectionMatrix(0.1f, farPlane);
+		auto viewMatrices = PointLightShadowMap::getLightViewMatrices(light.position);
+
+		for (int face = 0; face < 6; ++face)
+		{
+			mat4 shadowMatrix = projection * viewMatrices[face];
+			string uniformName = "shadowMatrices[" + std::to_string(face) + "]";
+			shadowPointShader->setMat4(uniformName, shadowMatrix);
+		}
+
+		// Render all models
+		const auto modelView = modelRegistry.view<ModelComponent>();
+		modelView.each([this](const ModelComponent& modelComp)
+		{
+			modelComp.drawInstanced(*shadowPointShader);
+		});
+	}
+
+	glCullFace(GL_BACK);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::renderSpotLightShadows()
+{
+	const auto spotLights = lightManager->getSpotLights();
+	const size_t numLights = std::min(spotLights.size(), static_cast<size_t>(MAX_SHADOW_CASTING_SPOT_LIGHTS));
+
+	// Ensure we have enough shadow maps
+	while (spotLightShadowMaps.size() < numLights)
+		spotLightShadowMaps.emplace_back(1024, 1024);
+
+	glCullFace(GL_FRONT);
+	shadowMapShader->use();
+
+	for (size_t i = 0; i < numLights; ++i)
+	{
+		const auto& light = spotLights[i];
+		auto& spotShadowMap = spotLightShadowMaps[i];
+
+		spotShadowMap.bindForWriting();
+
+		mat4 lightSpaceMatrix = spotShadowMap.getLightSpaceMatrix(
+			light.position,
+			normalize(light.direction),
+			light.outerCutOff,
+			0.1f, 50.0f
+		);
+		shadowMapShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+		// Render all models
+		const auto modelView = modelRegistry.view<ModelComponent>();
+		modelView.each([this](const ModelComponent& modelComp)
+		{
+			modelComp.drawInstanced(*shadowMapShader);
+		});
+	}
+
+	glCullFace(GL_BACK);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -199,10 +307,44 @@ void Renderer::renderScene()
 
 	g_camera.send(*mainShader, *skyboxShader);
 
-	// Bind shadow map for reading
+	// Bind directional shadow map for reading
 	shadowMap->bindForReading(GL_TEXTURE5);
 
 	mainShader->use();
+
+	// Bind point light shadow cubemaps (texture units 6-9)
+	const int numPointShadows = static_cast<int>(std::min(pointLightShadowMaps.size(),
+		static_cast<size_t>(MAX_SHADOW_CASTING_POINT_LIGHTS)));
+	mainShader->setInt("u_numPointShadowMaps", numPointShadows);
+	mainShader->setFloat("pointLightFarPlane", PointLightShadowMap::FAR_PLANE);
+
+	for (int i = 0; i < numPointShadows; ++i)
+	{
+		pointLightShadowMaps[i].bindForReading(GL_TEXTURE6 + i);
+		mainShader->setInt("pointShadowMaps[" + std::to_string(i) + "]", 6 + i);
+	}
+
+	// Bind spot light shadow maps (texture units 10-13)
+	const auto spotLights = lightManager->getSpotLights();
+	const int numSpotShadows = static_cast<int>(std::min(spotLightShadowMaps.size(),
+		static_cast<size_t>(MAX_SHADOW_CASTING_SPOT_LIGHTS)));
+	mainShader->setInt("u_numSpotShadowMaps", numSpotShadows);
+
+	for (int i = 0; i < numSpotShadows; ++i)
+	{
+		spotLightShadowMaps[i].bindForReading(GL_TEXTURE10 + i);
+		mainShader->setInt("spotShadowMaps[" + std::to_string(i) + "]", 10 + i);
+
+		// Calculate and send light space matrix
+		const auto& light = spotLights[i];
+		mat4 lightSpaceMatrix = spotLightShadowMaps[i].getLightSpaceMatrix(
+			light.position,
+			normalize(light.direction),
+			light.outerCutOff,
+			0.1f, 50.0f
+		);
+		mainShader->setMat4("spotLightSpaceMatrices[" + std::to_string(i) + "]", lightSpaceMatrix);
+	}
 
 	const auto modelView = modelRegistry.view<ModelComponent>();
 	modelView.each([&](const ModelComponent& modelComp)

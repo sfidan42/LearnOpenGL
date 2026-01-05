@@ -10,9 +10,8 @@ int main()
 
 	const string mainShaderPath = "shaders/main.glsl";
 	const string skyboxShaderPath = "shaders/skybox.glsl";
-	const string shadowShaderPath = "shaders/shadow.glsl";
 
-	if(!renderer.init(mainShaderPath, skyboxShaderPath, shadowShaderPath))
+	if(!renderer.init(mainShaderPath, skyboxShaderPath))
 	{
 		cout << "Failed to initialize renderer" << endl;
 		return -1;
@@ -79,11 +78,14 @@ int main()
 		);
 	}
 
-	constexpr TransformComponent boxTransform{
+	TransformComponent boxTransform{
 		.position = vec3(18.0f, -1.0f, 18.0f),
 		.rotation = vec3(0.0f),
 		.scale = vec3(0.05f)
 	};
+	renderer.loadModel("Cardboard_Box.fbx", boxTransform);
+	boxTransform.scale *= 0.3f;
+	boxTransform.position *= 0.3f;
 	renderer.loadModel("Cardboard_Box.fbx", boxTransform);
 
 	renderer.run();

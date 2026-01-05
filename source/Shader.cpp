@@ -28,7 +28,7 @@ Shader::ShaderSource Shader::read(const string& filepath)
 
 	string line;
 	ifstream file(full_path);
-	stringstream ss[2];
+	stringstream ss[3]; // 0=vertex, 1=geometry, 2=fragment
 
 	if(!file.is_open())
 	{
@@ -42,13 +42,15 @@ Shader::ShaderSource Shader::read(const string& filepath)
 		{
 			if(line.find("vertex") != string::npos)
 				i = 0;
-			else if(line.find("fragment") != string::npos)
+			else if(line.find("geometry") != string::npos)
 				i = 1;
+			else if(line.find("fragment") != string::npos)
+				i = 2;
 		}
 		else if(i != -1)
 			ss[i] << line << '\n';
 	}
-	return {ss[0].str(), ss[1].str()};
+	return {ss[0].str(), ss[1].str(), ss[2].str()};
 }
 
 static bool compile(GLuint shader, const char* shader_source)
@@ -82,7 +84,6 @@ void Shader::use() const
 void Shader::setMat4(const string& name, const mat4& matrix) const
 {
 	const GLint loc = glGetUniformLocation(program, name.c_str());
-	if(loc == -1) return;
 	GL_CHECK(glUniformMatrix4fv(loc, 1, GL_FALSE, &matrix[0][0]));
 }
 
@@ -117,6 +118,8 @@ GLuint Shader::create(const ShaderSource& shaderCode)
 
 	const char* vertexShaderSource = shaderCode.vertex.c_str();
 	const char* fragmentShaderSource = shaderCode.fragment.c_str();
+	const bool hasGeometry = !shaderCode.geometry.empty();
+
 	const GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 	if(vertexShader == 0)
 	{
@@ -129,6 +132,18 @@ GLuint Shader::create(const ShaderSource& shaderCode)
 		cerr << "Failed to create fragment shader" << endl;
 		return 0;
 	}
+
+	GLuint geometryShader = 0;
+	if(hasGeometry)
+	{
+		geometryShader = glCreateShader(GL_GEOMETRY_SHADER);
+		if(geometryShader == 0)
+		{
+			cerr << "Failed to create geometry shader" << endl;
+			return 0;
+		}
+	}
+
 	GLuint shaderProgram = glCreateProgram();
 	if(shaderProgram == 0)
 	{
@@ -140,11 +155,17 @@ GLuint Shader::create(const ShaderSource& shaderCode)
 		cerr << "Vertex shader source (on failure):\n" << vertexShaderSource << endl;
 		return 0;
 	}
+	if(hasGeometry && !compile(geometryShader, shaderCode.geometry.c_str())) {
+		cerr << "Geometry shader source (on failure):\n" << shaderCode.geometry << endl;
+		return 0;
+	}
 	if(!compile(fragmentShader, fragmentShaderSource)) {
 		cerr << "Fragment shader source (on failure):\n" << fragmentShaderSource << endl;
 		return 0;
 	}
 	glAttachShader(shaderProgram, vertexShader);
+	if(hasGeometry)
+		glAttachShader(shaderProgram, geometryShader);
 	glAttachShader(shaderProgram, fragmentShader);
 	glLinkProgram(shaderProgram);
 	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
@@ -153,10 +174,14 @@ GLuint Shader::create(const ShaderSource& shaderCode)
 		glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
 		cerr << "Shader program linking failed\n" << infoLog << endl;
 		cerr << "Vertex shader source (on link fail):\n" << vertexShaderSource << endl;
+		if(hasGeometry)
+			cerr << "Geometry shader source (on link fail):\n" << shaderCode.geometry << endl;
 		cerr << "Fragment shader source (on link fail):\n" << fragmentShaderSource << endl;
 		return 0;
 	}
 	glDeleteShader(vertexShader);
+	if(hasGeometry)
+		glDeleteShader(geometryShader);
 	glDeleteShader(fragmentShader);
 
 	return shaderProgram;

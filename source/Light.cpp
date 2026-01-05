@@ -215,3 +215,21 @@ void LightManager::syncSunLight() const
 	cachedSkyShader.setVec3("sunLight.diffuse", sunLight.diffuse);
 	cachedSkyShader.setVec3("sunLight.specular", sunLight.specular);
 }
+
+std::vector<PointLightComponent> LightManager::getPointLights() const
+{
+	std::vector<PointLightComponent> lights;
+	const auto& view = lightRegistry.view<PointLightComponent>();
+	lights.reserve(view.size());
+	view.each([&](const PointLightComponent& light) { lights.push_back(light); });
+	return lights;
+}
+
+std::vector<SpotLightComponent> LightManager::getSpotLights() const
+{
+	std::vector<SpotLightComponent> lights;
+	const auto& view = lightRegistry.view<SpotLightComponent>();
+	lights.reserve(view.size());
+	view.each([&](const SpotLightComponent& light) { lights.push_back(light); });
+	return lights;
+}

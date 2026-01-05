@@ -54,6 +54,10 @@ public:
 
 	[[nodiscard]] vec3 getSunDirection() const { return sunLight.direction; }
 
+	// Access light data for shadow rendering
+	[[nodiscard]] std::vector<PointLightComponent> getPointLights() const;
+	[[nodiscard]] std::vector<SpotLightComponent> getSpotLights() const;
+
 private:
 	DirLightComponent sunLight{};
 

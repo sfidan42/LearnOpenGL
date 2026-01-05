@@ -33,6 +33,7 @@ private:
 	struct ShaderSource
 	{
 		string vertex;
+		string geometry;
 		string fragment;
 	};
 
