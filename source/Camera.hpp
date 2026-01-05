@@ -17,8 +17,8 @@ public:
 	void send(const Shader& mainShader, const Shader& skyShader) const;
 
 private:
-	mat4 getView() const;
-	mat4 getProj() const;
+	[[nodiscard]] mat4 getView() const;
+	[[nodiscard]] mat4 getProj() const;
 
 	// motion
 	vec3 eye{0.0f, 0.0f, 3.0f};

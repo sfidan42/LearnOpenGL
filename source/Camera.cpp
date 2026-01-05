@@ -2,22 +2,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/constants.hpp>
 
-mat4 Camera::getView() const
-{
-	return glm::lookAt(eye, target, up);
-}
-
-mat4 Camera::getProj() const
-{
-	return perspective(radians(fov), aspect, zNear, zFar);
-}
-
-void Camera::setAspect(float width, float height)
+void Camera::setAspect(const float width, const float height)
 {
 	aspect = width / height;
 }
 
-void Camera::mouse(float xoffset, float yoffset)
+void Camera::mouse(float const xoffset, float const yoffset)
 {
 	yaw += xoffset * sensitivity;
 	pitch += yoffset * sensitivity;
@@ -52,4 +42,14 @@ void Camera::send(const Shader& mainShader, const Shader& skyShader) const
 	skyShader.use();
 	skyShader.setMat4("projection", proj);
 	skyShader.setMat4("view", mat4(mat3(view))); // Remove translation
+}
+
+mat4 Camera::getView() const
+{
+	return lookAt(eye, target, up);
+}
+
+mat4 Camera::getProj() const
+{
+	return perspective(radians(fov), aspect, zNear, zFar);
 }

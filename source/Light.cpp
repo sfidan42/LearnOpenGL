@@ -107,7 +107,7 @@ PointLight LightManager::createPointLight(const vec3& position, const vec3& colo
 	createPointLightShadowMap(lightEnt);
 	comp.shadowMapHandle = pointLightShadowHandles[lightEnt];
 
-	return { comp, lightEnt };
+	return {comp, lightEnt};
 }
 
 SpotLight LightManager::createSpotLight(const vec3& position, const vec3& direction, const vec3& color)
@@ -135,7 +135,7 @@ SpotLight LightManager::createSpotLight(const vec3& position, const vec3& direct
 	createSpotLightShadowMap(lightEnt);
 	comp.shadowMapHandle = spotLightShadowHandles[lightEnt];
 
-	return { comp, lightEnt };
+	return {comp, lightEnt};
 }
 
 void LightManager::updatePointLight(const PointLight& light)
@@ -183,7 +183,7 @@ std::vector<SpotLightComponent> LightManager::getSpotLights() const
 std::unordered_map<entt::entity, PointLightShadowMap*> LightManager::getPointLightShadowMaps()
 {
 	std::unordered_map<entt::entity, PointLightShadowMap*> result;
-	for (auto& [entity, shadowMap] : pointLightShadowMaps)
+	for(auto& [entity, shadowMap] : pointLightShadowMaps)
 		result[entity] = shadowMap.get();
 	return result;
 }
@@ -191,7 +191,7 @@ std::unordered_map<entt::entity, PointLightShadowMap*> LightManager::getPointLig
 std::unordered_map<entt::entity, SpotLightShadowMap*> LightManager::getSpotLightShadowMaps()
 {
 	std::unordered_map<entt::entity, SpotLightShadowMap*> result;
-	for (auto& [entity, shadowMap] : spotLightShadowMaps)
+	for(auto& [entity, shadowMap] : spotLightShadowMaps)
 		result[entity] = shadowMap.get();
 	return result;
 }
@@ -201,11 +201,11 @@ void LightManager::updateSpotLightMatrices()
 	auto view = lightRegistry.view<SpotLightComponent>();
 	bool hasLights = false;
 
-	for (auto [entity, light] : view.each())
+	for(auto [entity, light] : view.each())
 	{
 		hasLights = true;
 		auto it = spotLightShadowMaps.find(entity);
-		if (it != spotLightShadowMaps.end())
+		if(it != spotLightShadowMaps.end())
 		{
 			light.lightSpaceMatrix = it->second->getLightSpaceMatrix(
 				light.position,
@@ -217,7 +217,7 @@ void LightManager::updateSpotLightMatrices()
 	}
 
 	// Force sync the SSBO so the shader sees the updated matrices
-	if (hasLights)
+	if(hasLights)
 	{
 		syncSpotLights(lightRegistry, entt::null);
 	}
@@ -317,7 +317,7 @@ void LightManager::createSpotLightShadowMap(entt::entity entity)
 void LightManager::destroyPointLightShadowMap(entt::entity entity)
 {
 	auto it = pointLightShadowHandles.find(entity);
-	if (it != pointLightShadowHandles.end())
+	if(it != pointLightShadowHandles.end())
 	{
 		glMakeTextureHandleNonResidentARB(it->second);
 		pointLightShadowHandles.erase(it);
@@ -328,7 +328,7 @@ void LightManager::destroyPointLightShadowMap(entt::entity entity)
 void LightManager::destroySpotLightShadowMap(entt::entity entity)
 {
 	auto it = spotLightShadowHandles.find(entity);
-	if (it != spotLightShadowHandles.end())
+	if(it != spotLightShadowHandles.end())
 	{
 		glMakeTextureHandleNonResidentARB(it->second);
 		spotLightShadowHandles.erase(it);

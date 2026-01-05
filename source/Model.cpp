@@ -187,19 +187,19 @@ Mesh::~Mesh()
 }
 
 Mesh::Mesh(Mesh&& other) noexcept
-	: vertices(std::move(other.vertices)),
-	  indices(std::move(other.indices)),
-	  textures(std::move(other.textures)),
-	  VAO(other.VAO),
-	  VBO(other.VBO),
-	  EBO(other.EBO),
-	  instanceVBO(other.instanceVBO),
-	  diffuseHandlesSSBO(other.diffuseHandlesSSBO),
-	  specularHandlesSSBO(other.specularHandlesSSBO),
-	  normalHandlesSSBO(other.normalHandlesSSBO),
-	  diffuseHandles(std::move(other.diffuseHandles)),
-	  specularHandles(std::move(other.specularHandles)),
-	  normalHandles(std::move(other.normalHandles))
+: vertices(std::move(other.vertices)),
+  indices(std::move(other.indices)),
+  textures(std::move(other.textures)),
+  VAO(other.VAO),
+  VBO(other.VBO),
+  EBO(other.EBO),
+  instanceVBO(other.instanceVBO),
+  diffuseHandlesSSBO(other.diffuseHandlesSSBO),
+  specularHandlesSSBO(other.specularHandlesSSBO),
+  normalHandlesSSBO(other.normalHandlesSSBO),
+  diffuseHandles(std::move(other.diffuseHandles)),
+  specularHandles(std::move(other.specularHandles)),
+  normalHandles(std::move(other.normalHandles))
 {
 	// Nullify the source so it doesn't delete our resources
 	other.VAO = 0;
@@ -542,8 +542,8 @@ vector<TextureComponent> Model::loadMaterialTextures(const aiMaterial* mat, aiTe
 
 						// Check if the paths match (exact match or basename match)
 						if(embeddedName == texPathStr ||
-						   embeddedName.find(texPathStr) != string::npos ||
-						   texPathStr.find(embeddedName) != string::npos)
+							embeddedName.find(texPathStr) != string::npos ||
+							texPathStr.find(embeddedName) != string::npos)
 						{
 							embeddedTex = atex;
 							break;
@@ -568,7 +568,8 @@ vector<TextureComponent> Model::loadMaterialTextures(const aiMaterial* mat, aiTe
 					// compressed image format (PNG/JPEG) inside memory
 					const unsigned int size = embeddedTex->mWidth;
 					data = stbi_load_from_memory(
-						static_cast<unsigned char*>(const_cast<void*>(reinterpret_cast<const void*>(embeddedTex->pcData))),
+						static_cast<unsigned char*>(const_cast<void*>(reinterpret_cast<const void*>(embeddedTex->
+							pcData))),
 						static_cast<int>(size), &width, &height, &nrComponents, 0);
 				}
 				else

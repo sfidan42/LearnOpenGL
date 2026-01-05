@@ -151,15 +151,18 @@ GLuint Shader::create(const ShaderSource& shaderCode)
 		return 0;
 	}
 
-	if(!compile(vertexShader, vertexShaderSource)) {
+	if(!compile(vertexShader, vertexShaderSource))
+	{
 		cerr << "Vertex shader source (on failure):\n" << vertexShaderSource << endl;
 		return 0;
 	}
-	if(hasGeometry && !compile(geometryShader, shaderCode.geometry.c_str())) {
+	if(hasGeometry && !compile(geometryShader, shaderCode.geometry.c_str()))
+	{
 		cerr << "Geometry shader source (on failure):\n" << shaderCode.geometry << endl;
 		return 0;
 	}
-	if(!compile(fragmentShader, fragmentShaderSource)) {
+	if(!compile(fragmentShader, fragmentShaderSource))
+	{
 		cerr << "Fragment shader source (on failure):\n" << fragmentShaderSource << endl;
 		return 0;
 	}

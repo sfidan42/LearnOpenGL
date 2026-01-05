@@ -225,13 +225,12 @@ void Renderer::renderPointLightShadows()
 		auto it = shadowMaps.find(entity);
 		if(it == shadowMaps.end()) continue;
 
-		auto* shadowMap = it->second;
-		shadowMap->bindForWriting();
+		it->second->bindForWriting();
 
 		shadowPointShader->setVec3("lightPos", light.position);
 
 		// Calculate and set the 6 shadow matrices
-		mat4 projection = shadowMap->getLightProjectionMatrix(0.1f, farPlane);
+		mat4 projection = PointLightShadowMap::getLightProjectionMatrix(0.1f, farPlane);
 		auto viewMatrices = PointLightShadowMap::getLightViewMatrices(light.position);
 
 		for(int face = 0; face < 6; ++face)

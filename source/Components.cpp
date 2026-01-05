@@ -43,7 +43,7 @@ mat4 TransformComponent::bake() const
 
 void ModelComponent::drawInstanced(const Shader& shader) const
 {
-	if (instances.empty())
+	if(instances.empty())
 		return;
 	shader.use();
 	model.drawInstanced(shader, instanceMatrices);
