@@ -134,30 +134,11 @@ void Renderer::run()
 		g_camera.update(deltaTime);
 		g_camera.send(*mainShader, *skyboxShader);
 
-		mainShader->use();
-		for (const auto modelEnt : modelRegistry.view<ModelComponent>())
+		auto modelView = modelRegistry.view<ModelComponent>();
+		modelView.each([&](const ModelComponent& modelComp)
 		{
-			auto& modelComp = modelRegistry.get<ModelComponent>(modelEnt);
-			if (modelComp.instances.empty())
-				continue;
-
-			vector<mat4> matrices(modelComp.instances.size());
-			for (size_t i = 0; i < modelComp.instances.size(); ++i)
-			{
-				auto instanceEnt = modelComp.instances[i];
-				auto& [positionVec, rotationVec, scaleVec] = modelRegistry.get<TransformComponent>(instanceEnt);
-
-				mat4 modelMat(1.0f);
-				modelMat = translate(modelMat, positionVec);
-				modelMat = rotate(modelMat, rotationVec.x, {1, 0, 0});
-				modelMat = rotate(modelMat, rotationVec.y, {0, 1, 0});
-				modelMat = rotate(modelMat, rotationVec.z, {0, 0, 1});
-				modelMat = scale(modelMat, scaleVec);
-
-				matrices[i] = modelMat;
-			}
-			modelComp.model.drawInstanced(*mainShader, matrices);
-		}
+			modelComp.drawInstanced(*mainShader);
+		});
 
 		skybox->draw(*skyboxShader);
 
@@ -199,4 +180,8 @@ void Renderer::loadModel(const string& modelPath, const TransformComponent& tran
 	const entt::entity instance = modelRegistry.create();
 	modelRegistry.emplace<InstanceComponent>(instance, modelEntity);
 	modelRegistry.emplace<TransformComponent>(instance, transform);
+
+	// 3. Bake the transform and add it to the ModelComponent's instanceMatrices
+	auto& modelComp = modelRegistry.get<ModelComponent>(modelEntity);
+	modelComp.instanceMatrices.emplace_back(transform.bake());
 }

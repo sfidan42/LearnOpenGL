@@ -115,7 +115,7 @@ void Skybox::loadFaces(const string& directory, const string facePaths[6])
 	skyboxTextureID = CubemapFromFile(directory, facePaths);
 }
 
-void Skybox::scale(float scale)
+void Skybox::scale(const float scale)
 {
 	scaleFactor = scale;
 }

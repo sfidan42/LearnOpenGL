@@ -60,6 +60,10 @@ int main()
 	stbi_set_flip_vertically_on_load(false);
 	renderer.loadModel("low_poly_vehicle_mini_pack_4.3.glb", vechileTransform);
 
+	vechileTransform.position.x -= 10.0f;
+	vechileTransform.scale = vec3(0.6f);
+	renderer.loadModel("red car/Untitled.gltf", vechileTransform);
+
 	PointLight pLight = renderer.lightManager->createPointLight(
 		vec3(8.0f, 1.0f, 8.0f), // position
 		vec3(1.0f, 1.0f, 1.0f) // color
@@ -90,7 +94,7 @@ int main()
 
 	pLight.lightData.diffuse.r = 0.0f;
 	pLight.lightData.specular.r = 0.0f;
-	renderer.lightManager->syncPointLight(pLight);
+	renderer.lightManager->syncPointLight(pLight); // Apply changes
 
 	renderer.run();
 

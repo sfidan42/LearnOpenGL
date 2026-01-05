@@ -93,14 +93,14 @@ void Mesh::setup(const vector<Vertex>& vertices, const vector<Index>& indices,
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void Mesh::drawInstanced(const Shader& shader, const vector<mat4>& matrices) const
+void Mesh::drawInstanced(const Shader& shader, const vector<mat4>& instanceMatrices) const
 {
-	const int instanceCount = static_cast<int>(matrices.size());
+	const int instanceCount = static_cast<int>(instanceMatrices.size());
 	const int indexCount = static_cast<int>(indices.size());
 
 	// Upload the gathered matrices to the instanceVBO
 	glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-	glBufferData(GL_ARRAY_BUFFER, instanceCount * sizeof(mat4), matrices.data(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, instanceCount * sizeof(mat4), instanceMatrices.data(), GL_DYNAMIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	bind(shader);
@@ -411,6 +411,8 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& t
 	}
 
 	aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+
+	// Load diffuse/base color textures (try both for compatibility)
 	vector<TextureComponent> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "diffuse", scene);
 	vector<TextureComponent> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "specular", scene);
 	vector<TextureComponent> normalMaps = loadMaterialTextures(material, aiTextureType_NORMALS, "normal", scene);
@@ -421,8 +423,7 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& t
 	textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 	textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
 
-	entt::entity entity = registry.create();
-	Mesh& meshComp = registry.emplace<Mesh>(entity);
+	Mesh& meshComp = registry.emplace<Mesh>(registry.create());
 	meshComp.setup(vertices, indices, textures);
 }
 
@@ -597,8 +598,11 @@ Model& Model::operator=(Model&& other) noexcept
 	return *this;
 }
 
-void Model::drawInstanced(const Shader& shader, const vector<mat4>& matrices) const
+void Model::drawInstanced(const Shader& shader, const vector<mat4>& instanceMatrices) const
 {
 	const auto view = registry.view<Mesh>();
-	view.each([&shader, &matrices](const Mesh& mesh) { mesh.drawInstanced(shader, matrices); });
+	view.each([&shader, &instanceMatrices](const Mesh& mesh)
+	{
+		mesh.drawInstanced(shader, instanceMatrices);
+	});
 }

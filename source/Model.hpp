@@ -25,10 +25,10 @@ public:
 	Mesh& operator=(Mesh&& other) noexcept;
 
 	void setup(const vector<Vertex>& vertices, const vector<Index>& indices, const vector<TextureComponent>& textures);
-	void drawInstanced(const Shader& shader, const vector<mat4>& matrices) const;
-	void cleanup();
+	void drawInstanced(const Shader& shader, const vector<mat4>& instanceMatrices) const;
 
 private:
+	void cleanup();
 	void bind(const Shader& shader) const;
 
 	vector<Vertex> vertices;
@@ -41,9 +41,9 @@ private:
 	GLuint diffuseHandlesSSBO{};
 	GLuint specularHandlesSSBO{};
 	GLuint normalHandlesSSBO{};
-	std::vector<GLuint64> diffuseHandles;
-	std::vector<GLuint64> specularHandles;
-	std::vector<GLuint64> normalHandles;
+	vector<GLuint64> diffuseHandles;
+	vector<GLuint64> specularHandles;
+	vector<GLuint64> normalHandles;
 };
 
 bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID);
@@ -63,7 +63,7 @@ public:
 	Model(Model&& other) noexcept;
 	Model& operator=(Model&& other) noexcept;
 
-	void drawInstanced(const Shader& shader, const vector<mat4>& matrices) const;
+	void drawInstanced(const Shader& shader, const vector<mat4>& instanceMatrices) const;
 
 private:
 	void loadModel(const string& modelPath);

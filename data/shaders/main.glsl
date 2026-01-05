@@ -151,6 +151,8 @@ void main()
 
 // ================= MATERIAL HELPERS =================
 
+const vec3 MISSING_TEXTURE_COLOR = vec3(1.0, 0.0, 1.0); // Magenta for missing textures (like Blender)
+
 vec3 GetNormal()
 {
     if (u_numNormalTextures <= 0)
@@ -170,7 +172,7 @@ vec3 GetNormal()
 vec3 GetDiffuseColor()
 {
     if (u_numDiffuseTextures <= 0)
-        return vec3(1.0);
+        return MISSING_TEXTURE_COLOR; // Show magenta for missing diffuse texture
 
     vec3 color = vec3(0.0);
     for (int i = 0; i < u_numDiffuseTextures; i++)
@@ -182,7 +184,7 @@ vec3 GetDiffuseColor()
 vec3 GetSpecularColor()
 {
     if (u_numSpecularTextures <= 0)
-        return vec3(0.0);
+        return vec3(0.5); // Gray fallback for missing specular (common default)
 
     vec3 color = vec3(0.0);
     for (int i = 0; i < u_numSpecularTextures; i++)
