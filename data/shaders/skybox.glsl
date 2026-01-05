@@ -21,7 +21,7 @@ void main()
 
 struct DirLight
 {
-    vec3 direction; // This should be the direction TO the light
+    vec3 direction;
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
@@ -40,9 +40,8 @@ void main()
 
     vec3 normalDir = normalize(textureDir);
 
-    // Use the direction AS the target.
-    // If direction is (0, 1, 0), the sun is at the top.
-    vec3 sunDir = normalize(sunLight.direction);
+    // If direction is (0, -1, 0), the sun is at the top.
+    vec3 sunDir = normalize(-sunLight.direction);
 
     float cosTheta = max(dot(normalDir, sunDir), 0.0);
 

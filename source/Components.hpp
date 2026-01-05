@@ -65,16 +65,16 @@ struct SpotLightComponent
 	float quadratic; // Row 5
 }; // Total 80 bytes
 
-struct PointLight
+struct DirLightComponent
 {
-	entt::entity lightEntity;
-	PointLightComponent& lightData;
-};
-
-struct SpotLight
-{
-	entt::entity lightEntity;
-	SpotLightComponent& lightData;
+	vec3 direction;
+	float _pad0;
+	vec3 ambient;
+	float _pad1;
+	vec3 diffuse;
+	float _pad2;
+	vec3 specular;
+	float _pad3;
 };
 
 void setupInstanceTracking(entt::registry& registry);

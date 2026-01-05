@@ -526,13 +526,99 @@ vector<TextureComponent> Model::loadMaterialTextures(const aiMaterial* mat, aiTe
 				cout << "Embedded texture index out of range: " << texPath << endl;
 			}
 
-			// fallback: try loading texture from file on disk
-			texture.id = TextureFromFile(this->directory + "/" + str.C_Str(), texture.handle);
-			texture.type = typeName;
-			texture.path = str.C_Str();
-			textures.push_back(texture);
-			registry.emplace<TextureComponent>(registry.create(), texture);
-			// store it as texture loaded for entire model, to ensure we won't unnecessary load duplicate textures.
+			// Check if texture is embedded in the scene (FBX files often embed textures with paths like "Cardboard_Box.fbm/texture.jpg")
+			const aiTexture* embeddedTex = nullptr;
+			if(scene->mTextures && scene->mNumTextures > 0)
+			{
+				// Search for embedded texture by filename
+				for(unsigned int t = 0; t < scene->mNumTextures; ++t)
+				{
+					const aiTexture* atex = scene->mTextures[t];
+					if(atex->mFilename.length > 0)
+					{
+						// Compare the texture path with the embedded texture filename
+						string embeddedName = string(atex->mFilename.C_Str());
+						string texPathStr = string(str.C_Str());
+
+						// Check if the paths match (exact match or basename match)
+						if(embeddedName == texPathStr ||
+						   embeddedName.find(texPathStr) != string::npos ||
+						   texPathStr.find(embeddedName) != string::npos)
+						{
+							embeddedTex = atex;
+							break;
+						}
+					}
+				}
+			}
+
+			if(embeddedTex)
+			{
+				// Load embedded texture
+				unsigned int textureID;
+				glGenTextures(1, &textureID);
+				glBindTexture(GL_TEXTURE_2D, textureID);
+
+				int width = 0, height = 0, nrComponents = 0;
+				unsigned char* data = nullptr;
+				bool dataAllocated = false;
+
+				if(embeddedTex->mHeight == 0)
+				{
+					// compressed image format (PNG/JPEG) inside memory
+					const unsigned int size = embeddedTex->mWidth;
+					data = stbi_load_from_memory(
+						static_cast<unsigned char*>(const_cast<void*>(reinterpret_cast<const void*>(embeddedTex->pcData))),
+						static_cast<int>(size), &width, &height, &nrComponents, 0);
+				}
+				else
+				{
+					// uncompressed RGBA32 image stored as aiTexel array
+					width = static_cast<int>(embeddedTex->mWidth);
+					height = static_cast<int>(embeddedTex->mHeight);
+					nrComponents = 4;
+					const size_t bufSize = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+					data = static_cast<unsigned char*>(malloc(bufSize));
+					dataAllocated = true;
+					const auto texels = reinterpret_cast<aiTexel*>(embeddedTex->pcData);
+					for(size_t p = 0; p < static_cast<size_t>(width) * static_cast<size_t>(height); ++p)
+					{
+						data[p * 4 + 0] = texels[p].r;
+						data[p * 4 + 1] = texels[p].g;
+						data[p * 4 + 2] = texels[p].b;
+						data[p * 4 + 3] = texels[p].a;
+					}
+				}
+
+				texture.id = 0;
+				texture.handle = 0;
+				if(data)
+				{
+					if(!ProcessTexture(data, width, height, nrComponents, textureID))
+						cout << "Failed to process embedded texture at path: " << str.C_Str() << endl;
+					dataAllocated ? free(data) : stbi_image_free(data);
+					texture.id = textureID;
+
+					// Get bindless texture handle and make it resident
+					texture.handle = glGetTextureHandleARB(textureID);
+					glMakeTextureHandleResidentARB(texture.handle);
+				}
+
+				texture.type = typeName;
+				texture.path = str.C_Str();
+				textures.push_back(texture);
+				registry.emplace<TextureComponent>(registry.create(), texture);
+			}
+			else
+			{
+				// fallback: try loading texture from file on disk
+				texture.id = TextureFromFile(this->directory + "/" + str.C_Str(), texture.handle);
+				texture.type = typeName;
+				texture.path = str.C_Str();
+				textures.push_back(texture);
+				registry.emplace<TextureComponent>(registry.create(), texture);
+				// store it as texture loaded for entire model, to ensure we won't unnecessary load duplicate textures.
+			}
 		}
 	}
 	return textures;

@@ -14,13 +14,15 @@ Renderer::~Renderer()
 	delete lightManager;
 	delete mainShader;
 	delete skyboxShader;
+	delete shadowShader;
 	delete skybox;
+	delete shadowMap;
 	if(window)
 		glfwDestroyWindow(window);
 	glfwTerminate();
 }
 
-bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath)
+bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath, const string& shadowShaderPath)
 {
 	setenv("__NV_PRIME_RENDER_OFFLOAD", "1", 1);
 	setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 1);
@@ -90,6 +92,21 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 		return false;
 	}
 
+	// Load shadow shader
+	shadowShader = new Shader();
+	if(!shadowShader->load(shadowShaderPath))
+	{
+		cout << "Failed to load shadow shaders" << endl;
+		return false;
+	}
+
+	// Initialize shadow map (2048x2048 resolution)
+	shadowMap = new ShadowMap(2048, 2048);
+
+	// Set shadow map texture unit in main shader
+	mainShader->use();
+	mainShader->setInt("shadowMap", 5); // Use texture unit 5 for shadow map
+
 	skybox = new Skybox();
 
 	const string faces[6] = {
@@ -122,30 +139,80 @@ void Renderer::run()
 
 	while(!glfwWindowShouldClose(window))
 	{
-		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 		const auto currentTime = static_cast<float>(glfwGetTime());
 		const float deltaTime = currentTime - lastTime;
 		lastTime = currentTime;
 
-		lightManager->update(deltaTime, *mainShader, *skyboxShader);
-
+		lightManager->update(deltaTime);
 		g_camera.update(deltaTime);
-		g_camera.send(*mainShader, *skyboxShader);
 
-		auto modelView = modelRegistry.view<ModelComponent>();
-		modelView.each([&](const ModelComponent& modelComp)
-		{
-			modelComp.drawInstanced(*mainShader);
-		});
+		// ========== PASS 1: Shadow Map ==========
+		renderShadowPass();
 
-		skybox->draw(*skyboxShader);
+		// ========== PASS 2: Main Scene ==========
+		renderScene();
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 }
+
+void Renderer::renderShadowPass()
+{
+	shadowMap->bindForWriting();
+
+	// Use front face culling to reduce shadow acne
+	glCullFace(GL_FRONT);
+
+	shadowShader->use();
+
+	// Calculate light space matrix from sun direction
+	const vec3 sunDir = lightManager->getSunDirection();
+	const mat4 lightSpaceMatrix = shadowMap->getLightSpaceMatrix(sunDir, 30.0f, 0.1f, 100.0f);
+	shadowShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+	// Also send to main shader for fragment shader use
+	mainShader->use();
+	mainShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+	// Render all models to shadow map
+	shadowShader->use();
+	const auto modelView = modelRegistry.view<ModelComponent>();
+	modelView.each([&](const ModelComponent& modelComp)
+	{
+		modelComp.drawInstanced(*shadowShader);
+	});
+
+	// Reset to back face culling
+	glCullFace(GL_BACK);
+
+	// Unbind shadow framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::renderScene()
+{
+	// Restore viewport to window size
+	glViewport(0, 0, windowWidth, windowHeight);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	g_camera.send(*mainShader, *skyboxShader);
+
+	// Bind shadow map for reading
+	shadowMap->bindForReading(GL_TEXTURE5);
+
+	mainShader->use();
+
+	const auto modelView = modelRegistry.view<ModelComponent>();
+	modelView.each([&](const ModelComponent& modelComp)
+	{
+		modelComp.drawInstanced(*mainShader);
+	});
+
+	skybox->draw(*skyboxShader);
+}
+
 
 void Renderer::loadModel(const string& modelPath, const TransformComponent& transform)
 {
@@ -180,6 +247,7 @@ void Renderer::loadModel(const string& modelPath, const TransformComponent& tran
 	const entt::entity instance = modelRegistry.create();
 	modelRegistry.emplace<InstanceComponent>(instance, modelEntity);
 	modelRegistry.emplace<TransformComponent>(instance, transform);
+	// TODO: when scale is different thatn (1,1,1), position and rotation may need adjustment
 
 	// 3. Bake the transform and add it to the ModelComponent's instanceMatrices
 	auto& modelComp = modelRegistry.get<ModelComponent>(modelEntity);

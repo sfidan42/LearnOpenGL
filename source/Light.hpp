@@ -7,16 +7,24 @@
 
 using namespace glm;
 
-struct DirLightGPU
+struct PointLight
 {
-	vec3 direction;
-	float _pad0;
-	vec3 ambient;
-	float _pad1;
-	vec3 diffuse;
-	float _pad2;
-	vec3 specular;
-	float _pad3;
+	PointLight(PointLightComponent& component, entt::entity entity);
+	PointLightComponent& lightData;
+
+private:
+	entt::entity lightEntity;
+	friend class LightManager;
+};
+
+struct SpotLight
+{
+	SpotLight(SpotLightComponent& component, entt::entity entity);
+	SpotLightComponent& lightData;
+
+private:
+	entt::entity lightEntity;
+	friend class LightManager;
 };
 
 class LightManager
@@ -25,7 +33,7 @@ public:
 	LightManager(const Shader& mainShader, const Shader& skyShader);
 	~LightManager();
 
-	void update(float deltaTime, const Shader& mainShader, const Shader& skyShader);
+	void update(float deltaTime);
 
 	PointLight createPointLight(
 		const vec3& position,
@@ -38,14 +46,16 @@ public:
 		const vec3& color
 	);
 
-	void syncPointLight(const PointLight& light);
-	void syncSpotLight(const SpotLight& light);
+	void updatePointLight(const PointLight& light);
+	void updateSpotLight(const SpotLight& light);
 
 	void deletePointLight(const PointLight& light);
 	void deleteSpotLight(const SpotLight& light);
 
+	[[nodiscard]] vec3 getSunDirection() const { return sunLight.direction; }
+
 private:
-	DirLightGPU sunLight{};
+	DirLightComponent sunLight{};
 
 	entt::registry lightRegistry;
 
@@ -55,12 +65,12 @@ private:
 	float timeOfDay = 0.0f;
 
 	const Shader& cachedMainShader;
+	const Shader& cachedSkyShader;
 
 	void setupLightTracking();
-	void onLightUpdate(entt::registry& registry, entt::entity entity) const;
-	void sendPointLights(const Shader& mainShader) const;
-	void sendSpotLights(const Shader& mainShader) const;
-	void sendSunLight(const Shader& mainShader, const Shader& skyShader) const;
+	void syncPointLights(entt::registry& registry, entt::entity entity);
+	void syncSpotLights(entt::registry& registry, entt::entity entity);
+	void syncSunLight() const;
 };
 
 void setupLightTracking(LightManager& lManager, entt::registry& registry, const Shader& mainShader);

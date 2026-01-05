@@ -3,8 +3,16 @@
 #include <vector>
 #include <glm/glm.hpp>
 
+PointLight::PointLight(PointLightComponent& component, const entt::entity entity)
+: lightData(component), lightEntity(entity)
+{}
+
+SpotLight::SpotLight(SpotLightComponent& component, const entt::entity entity)
+: lightData(component), lightEntity(entity)
+{}
+
 LightManager::LightManager(const Shader& mainShader, const Shader& skyShader)
-: cachedMainShader(mainShader)
+: cachedMainShader(mainShader), cachedSkyShader(skyShader)
 {
 	// Create SSBOs for dynamic lights
 	glGenBuffers(1, &pointLightSSBO);
@@ -22,7 +30,7 @@ LightManager::LightManager(const Shader& mainShader, const Shader& skyShader)
 	// Soft yellowish specular highlights
 	sunLight.specular = vec3(0.8f, 0.7f, 0.3f);
 
-	sendSunLight(mainShader, skyShader);
+	syncSunLight();
 }
 
 LightManager::~LightManager()
@@ -33,31 +41,34 @@ LightManager::~LightManager()
 		glDeleteBuffers(1, &spotLightSSBO);
 }
 
-void LightManager::update(const float deltaTime, const Shader& mainShader, const Shader& skyShader)
+void LightManager::update(const float deltaTime)
 {
 	// Adjust speed as needed (e.g., 0.1f for a slow cycle)
 	timeOfDay += deltaTime * 0.2f;
 
 	// 1. Calculate Sun Position
+	// The sun orbits around, with sunY indicating height above/below horizon
 	const float sunX = cosf(timeOfDay);
 	const float sunZ = sinf(timeOfDay);
 	const float sunY = sinf(timeOfDay);
 
-	sunLight.direction = glm::normalize(vec3(sunX, sunY, sunZ));
+	// sunLight.direction should point FROM the sun TO the scene (downward when sun is up)
+	// When sunY > 0, the sun is above the horizon, so light should come from above (negative Y direction)
+	sunLight.direction = normalize(-vec3(sunX, sunY, sunZ));
 
 	// 2. Define Time-of-Day Colors
-	vec3 deepNight = vec3(0.01f, 0.01f, 0.02f);
-	vec3 sunrise = vec3(1.0f, 0.4f, 0.1f);
-	vec3 noon = vec3(1.0f, 1.0f, 0.9f);
-	vec3 sunset = vec3(0.9f, 0.3f, 0.05f);
+	constexpr auto deepNight = vec3(0.01f, 0.01f, 0.02f);
+	constexpr auto sunrise = vec3(1.0f, 0.4f, 0.1f);
+	constexpr auto noon = vec3(1.0f, 1.0f, 0.9f);
+	constexpr auto sunset = vec3(0.9f, 0.3f, 0.05f);
 
 	// 3. Dynamic Color Interpolation based on sunY (height)
 	if(sunY > 0.0f)
 	{
 		// Sun is above the horizon (Day/Sunrise/Sunset)
 		// Interpolate between Sunset/Sunrise (low Y) and Noon (high Y)
-		float factor = sunY; // 0.0 at horizon, 1.0 at peak
-		sunLight.diffuse = glm::mix(sunrise, noon, factor);
+		const float factor = sunY; // 0.0 at horizon, 1.0 at peak
+		sunLight.diffuse = mix(sunrise, noon, factor);
 		sunLight.ambient = sunLight.diffuse * 0.2f;
 		sunLight.specular = sunLight.diffuse;
 	}
@@ -65,13 +76,13 @@ void LightManager::update(const float deltaTime, const Shader& mainShader, const
 	{
 		// Sun is below horizon (Night)
 		// Fade from sunset color to deep night
-		float factor = glm::clamp(sunY * -5.0f, 0.0f, 1.0f);
-		sunLight.diffuse = glm::mix(sunset * 0.1f, deepNight, factor);
+		const float factor = glm::clamp(sunY * -5.0f, 0.0f, 1.0f);
+		sunLight.diffuse = mix(sunset * 0.1f, deepNight, factor);
 		sunLight.ambient = vec3(0.02f, 0.02f, 0.05f);
 		sunLight.specular = vec3(0.0f);
 	}
 
-	sendSunLight(mainShader, skyShader);
+	syncSunLight();
 }
 
 PointLight LightManager::createPointLight(const vec3& position, const vec3& color)
@@ -87,8 +98,8 @@ PointLight LightManager::createPointLight(const vec3& position, const vec3& colo
 	lightComp._pad = 0.0f;
 	const entt::entity lightEnt = lightRegistry.create();
 	return {
-		lightEnt,
-		lightRegistry.emplace<PointLightComponent>(lightEnt, lightComp)
+		lightRegistry.emplace<PointLightComponent>(lightEnt, lightComp),
+		lightEnt
 	};
 }
 
@@ -96,9 +107,9 @@ SpotLight LightManager::createSpotLight(const vec3& position, const vec3& direct
 {
 	SpotLightComponent lightComp{};
 	lightComp.position = position;
-	lightComp.cutOff = glm::cos(glm::radians(12.5f));
+	lightComp.cutOff = cos(radians(12.5f));
 	lightComp.direction = direction;
-	lightComp.outerCutOff = glm::cos(glm::radians(17.5f));
+	lightComp.outerCutOff = cos(radians(17.5f));
 	lightComp.ambient = color * 0.1f;
 	lightComp.constant = 1.0f;
 	lightComp.diffuse = color;
@@ -107,17 +118,17 @@ SpotLight LightManager::createSpotLight(const vec3& position, const vec3& direct
 	lightComp.quadratic = 0.032f;
 	const entt::entity lightEnt = lightRegistry.create();
 	return {
-		lightEnt,
-		lightRegistry.emplace<SpotLightComponent>(lightEnt, lightComp)
+		lightRegistry.emplace<SpotLightComponent>(lightEnt, lightComp),
+		lightEnt
 	};
 }
 
-void LightManager::syncPointLight(const PointLight& light)
+void LightManager::updatePointLight(const PointLight& light)
 {
 	lightRegistry.patch<PointLightComponent>(light.lightEntity);
 }
 
-void LightManager::syncSpotLight(const SpotLight& light)
+void LightManager::updateSpotLight(const SpotLight& light)
 {
 	lightRegistry.patch<SpotLightComponent>(light.lightEntity);
 }
@@ -125,37 +136,30 @@ void LightManager::syncSpotLight(const SpotLight& light)
 void LightManager::deletePointLight(const PointLight& light)
 {
 	lightRegistry.destroy(light.lightEntity);
+	syncPointLights(lightRegistry, light.lightEntity);
 }
 
 void LightManager::deleteSpotLight(const SpotLight& light)
 {
 	lightRegistry.destroy(light.lightEntity);
+	syncSpotLights(lightRegistry, light.lightEntity);
 }
 
 void LightManager::setupLightTracking()
 {
-	// Point Lights
-	lightRegistry.on_construct<PointLightComponent>().connect<&LightManager::onLightUpdate>(this);
-	lightRegistry.on_update<PointLightComponent>().connect<&LightManager::onLightUpdate>(this);
-	lightRegistry.on_destroy<PointLightComponent>().connect<&LightManager::onLightUpdate>(this);
+	// Connect the reactive storage to the registry and set up callbacks
+	lightRegistry.on_construct<PointLightComponent>().connect<&LightManager::syncPointLights>(*this);
+	lightRegistry.on_update<PointLightComponent>().connect<&LightManager::syncPointLights>(*this);
 
-	// Spot Lights
-	lightRegistry.on_construct<SpotLightComponent>().connect<&LightManager::onLightUpdate>(this);
-	lightRegistry.on_update<SpotLightComponent>().connect<&LightManager::onLightUpdate>(this);
-	lightRegistry.on_destroy<SpotLightComponent>().connect<&LightManager::onLightUpdate>(this);
+	lightRegistry.on_construct<SpotLightComponent>().connect<&LightManager::syncSpotLights>(*this);
+	lightRegistry.on_update<SpotLightComponent>().connect<&LightManager::syncSpotLights>(*this);
 }
 
-void LightManager::onLightUpdate(entt::registry& registry, entt::entity entity) const
+void LightManager::syncPointLights(entt::registry& /*registry*/, entt::entity /*entity*/)
 {
 	cachedMainShader.use();
-	sendPointLights(cachedMainShader);
-	sendSpotLights(cachedMainShader);
-}
-
-void LightManager::sendPointLights(const Shader& mainShader) const
-{
 	const uint32_t pLightsCount = lightRegistry.view<PointLightComponent>().size();
-	mainShader.setInt("u_numPointLights", pLightsCount);
+	cachedMainShader.setInt("u_numPointLights", pLightsCount);
 
 	vector<PointLightComponent> pointLights;
 	pointLights.reserve(pLightsCount);
@@ -172,10 +176,11 @@ void LightManager::sendPointLights(const Shader& mainShader) const
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, pointLightSSBO);
 }
 
-void LightManager::sendSpotLights(const Shader& mainShader) const
+void LightManager::syncSpotLights(entt::registry& /*registry*/, entt::entity /*entity*/)
 {
+	cachedMainShader.use();
 	const uint32_t sLightsCount = lightRegistry.view<SpotLightComponent>().size();
-	mainShader.setInt("u_numSpotLights", sLightsCount);
+	cachedMainShader.setInt("u_numSpotLights", sLightsCount);
 
 	vector<SpotLightComponent> spotLights;
 	spotLights.reserve(sLightsCount);
@@ -190,24 +195,23 @@ void LightManager::sendSpotLights(const Shader& mainShader) const
 		GL_DYNAMIC_DRAW
 	);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, spotLightSSBO);
-
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void LightManager::sendSunLight(const Shader& mainShader, const Shader& skyShader) const
+void LightManager::syncSunLight() const
 {
-	mainShader.use();
+	cachedMainShader.use();
 
 	// Send directional light
-	mainShader.setVec3("sunLight.direction", sunLight.direction);
-	mainShader.setVec3("sunLight.ambient", sunLight.ambient);
-	mainShader.setVec3("sunLight.diffuse", sunLight.diffuse);
-	mainShader.setVec3("sunLight.specular", sunLight.specular);
+	cachedMainShader.setVec3("sunLight.direction", sunLight.direction);
+	cachedMainShader.setVec3("sunLight.ambient", sunLight.ambient);
+	cachedMainShader.setVec3("sunLight.diffuse", sunLight.diffuse);
+	cachedMainShader.setVec3("sunLight.specular", sunLight.specular);
 
-	skyShader.use();
+	cachedSkyShader.use();
 
-	skyShader.setVec3("sunLight.direction", sunLight.direction);
-	skyShader.setVec3("sunLight.ambient", sunLight.ambient);
-	skyShader.setVec3("sunLight.diffuse", sunLight.diffuse);
-	skyShader.setVec3("sunLight.specular", sunLight.specular);
+	cachedSkyShader.setVec3("sunLight.direction", sunLight.direction);
+	cachedSkyShader.setVec3("sunLight.ambient", sunLight.ambient);
+	cachedSkyShader.setVec3("sunLight.diffuse", sunLight.diffuse);
+	cachedSkyShader.setVec3("sunLight.specular", sunLight.specular);
 }
