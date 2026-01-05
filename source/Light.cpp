@@ -162,6 +162,67 @@ void LightManager::deleteSpotLight(const SpotLight& light)
 	syncSpotLights(lightRegistry, light.lightEntity);
 }
 
+std::vector<PointLightComponent> LightManager::getPointLights() const
+{
+	std::vector<PointLightComponent> lights;
+	const auto& view = lightRegistry.view<PointLightComponent>();
+	lights.reserve(view.size());
+	view.each([&](const PointLightComponent& light) { lights.push_back(light); });
+	return lights;
+}
+
+std::vector<SpotLightComponent> LightManager::getSpotLights() const
+{
+	std::vector<SpotLightComponent> lights;
+	const auto& view = lightRegistry.view<SpotLightComponent>();
+	lights.reserve(view.size());
+	view.each([&](const SpotLightComponent& light) { lights.push_back(light); });
+	return lights;
+}
+
+std::unordered_map<entt::entity, PointLightShadowMap*> LightManager::getPointLightShadowMaps()
+{
+	std::unordered_map<entt::entity, PointLightShadowMap*> result;
+	for (auto& [entity, shadowMap] : pointLightShadowMaps)
+		result[entity] = shadowMap.get();
+	return result;
+}
+
+std::unordered_map<entt::entity, SpotLightShadowMap*> LightManager::getSpotLightShadowMaps()
+{
+	std::unordered_map<entt::entity, SpotLightShadowMap*> result;
+	for (auto& [entity, shadowMap] : spotLightShadowMaps)
+		result[entity] = shadowMap.get();
+	return result;
+}
+
+void LightManager::updateSpotLightMatrices()
+{
+	auto view = lightRegistry.view<SpotLightComponent>();
+	bool hasLights = false;
+
+	for (auto [entity, light] : view.each())
+	{
+		hasLights = true;
+		auto it = spotLightShadowMaps.find(entity);
+		if (it != spotLightShadowMaps.end())
+		{
+			light.lightSpaceMatrix = it->second->getLightSpaceMatrix(
+				light.position,
+				normalize(light.direction),
+				light.outerCutOff,
+				0.1f, 50.0f
+			);
+		}
+	}
+
+	// Force sync the SSBO so the shader sees the updated matrices
+	if (hasLights)
+	{
+		syncSpotLights(lightRegistry, entt::null);
+	}
+}
+
 void LightManager::setupLightTracking()
 {
 	// Connect the reactive storage to the registry and set up callbacks
@@ -233,24 +294,6 @@ void LightManager::syncSunLight() const
 	cachedSkyShader.setVec3("sunLight.specular", sunLight.specular);
 }
 
-std::vector<PointLightComponent> LightManager::getPointLights() const
-{
-	std::vector<PointLightComponent> lights;
-	const auto& view = lightRegistry.view<PointLightComponent>();
-	lights.reserve(view.size());
-	view.each([&](const PointLightComponent& light) { lights.push_back(light); });
-	return lights;
-}
-
-std::vector<SpotLightComponent> LightManager::getSpotLights() const
-{
-	std::vector<SpotLightComponent> lights;
-	const auto& view = lightRegistry.view<SpotLightComponent>();
-	lights.reserve(view.size());
-	view.each([&](const SpotLightComponent& light) { lights.push_back(light); });
-	return lights;
-}
-
 void LightManager::createPointLightShadowMap(entt::entity entity)
 {
 	auto shadowMap = std::make_unique<PointLightShadowMap>(512);
@@ -291,47 +334,4 @@ void LightManager::destroySpotLightShadowMap(entt::entity entity)
 		spotLightShadowHandles.erase(it);
 	}
 	spotLightShadowMaps.erase(entity);
-}
-
-std::unordered_map<entt::entity, PointLightShadowMap*> LightManager::getPointLightShadowMaps()
-{
-	std::unordered_map<entt::entity, PointLightShadowMap*> result;
-	for (auto& [entity, shadowMap] : pointLightShadowMaps)
-		result[entity] = shadowMap.get();
-	return result;
-}
-
-std::unordered_map<entt::entity, SpotLightShadowMap*> LightManager::getSpotLightShadowMaps()
-{
-	std::unordered_map<entt::entity, SpotLightShadowMap*> result;
-	for (auto& [entity, shadowMap] : spotLightShadowMaps)
-		result[entity] = shadowMap.get();
-	return result;
-}
-
-void LightManager::updateSpotLightMatrices()
-{
-	auto view = lightRegistry.view<SpotLightComponent>();
-	bool hasLights = false;
-
-	for (auto [entity, light] : view.each())
-	{
-		hasLights = true;
-		auto it = spotLightShadowMaps.find(entity);
-		if (it != spotLightShadowMaps.end())
-		{
-			light.lightSpaceMatrix = it->second->getLightSpaceMatrix(
-				light.position,
-				normalize(light.direction),
-				light.outerCutOff,
-				0.1f, 50.0f
-			);
-		}
-	}
-
-	// Force sync the SSBO so the shader sees the updated matrices
-	if (hasLights)
-	{
-		syncSpotLights(lightRegistry, entt::null);
-	}
 }

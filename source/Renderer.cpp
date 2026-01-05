@@ -54,17 +54,17 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 		return false;
 	}
 
-	const GLubyte* vendor   = glGetString(GL_VENDOR);
+	const GLubyte* vendor = glGetString(GL_VENDOR);
 	const GLubyte* renderer = glGetString(GL_RENDERER);
-	const GLubyte* version  = glGetString(GL_VERSION);
-	const GLubyte* sl       = glGetString(GL_SHADING_LANGUAGE_VERSION);
+	const GLubyte* version = glGetString(GL_VERSION);
+	const GLubyte* sl = glGetString(GL_SHADING_LANGUAGE_VERSION);
 
-	std::cout << "OpenGL Vendor   : " << vendor   << '\n';
+	std::cout << "OpenGL Vendor   : " << vendor << '\n';
 	std::cout << "OpenGL Renderer : " << renderer << '\n';
-	std::cout << "OpenGL Version  : " << version  << '\n';
-	std::cout << "GLSL Version    : " << sl       << '\n';
+	std::cout << "OpenGL Version  : " << version << '\n';
+	std::cout << "GLSL Version    : " << sl << '\n';
 
-	if (!GLAD_GL_ARB_bindless_texture)
+	if(!GLAD_GL_ARB_bindless_texture)
 	{
 		cout << "Bindless textures not supported by the GPU/driver" << endl;
 		return false;
@@ -160,9 +160,9 @@ void Renderer::run()
 		lightManager->updateSpotLightMatrices();
 
 		// ========== PASS 1: Shadow Maps ==========
-		renderShadowPass();        // Directional light
+		renderShadowPass(); // Directional light
 		renderPointLightShadows(); // Point lights (cubemaps)
-		renderSpotLightShadows();  // Spot lights (2D)
+		renderSpotLightShadows(); // Spot lights (2D)
 
 		// ========== PASS 2: Main Scene ==========
 		renderScene();
@@ -208,7 +208,7 @@ void Renderer::renderShadowPass()
 void Renderer::renderPointLightShadows()
 {
 	auto shadowMaps = lightManager->getPointLightShadowMaps();
-	if (shadowMaps.empty()) return;
+	if(shadowMaps.empty()) return;
 
 	glCullFace(GL_FRONT);
 	shadowPointShader->use();
@@ -220,10 +220,10 @@ void Renderer::renderPointLightShadows()
 	auto& registry = lightManager->getLightRegistry();
 	auto view = registry.view<PointLightComponent>();
 
-	for (auto [entity, light] : view.each())
+	for(auto [entity, light] : view.each())
 	{
 		auto it = shadowMaps.find(entity);
-		if (it == shadowMaps.end()) continue;
+		if(it == shadowMaps.end()) continue;
 
 		auto* shadowMap = it->second;
 		shadowMap->bindForWriting();
@@ -234,7 +234,7 @@ void Renderer::renderPointLightShadows()
 		mat4 projection = shadowMap->getLightProjectionMatrix(0.1f, farPlane);
 		auto viewMatrices = PointLightShadowMap::getLightViewMatrices(light.position);
 
-		for (int face = 0; face < 6; ++face)
+		for(int face = 0; face < 6; ++face)
 		{
 			mat4 lightShadowMatrix = projection * viewMatrices[face];
 			string uniformName = "shadowMatrices[" + std::to_string(face) + "]";
@@ -256,7 +256,7 @@ void Renderer::renderPointLightShadows()
 void Renderer::renderSpotLightShadows()
 {
 	auto shadowMaps = lightManager->getSpotLightShadowMaps();
-	if (shadowMaps.empty()) return;
+	if(shadowMaps.empty()) return;
 
 	glCullFace(GL_FRONT);
 	shadowMapShader->use();
@@ -265,10 +265,10 @@ void Renderer::renderSpotLightShadows()
 	auto& registry = lightManager->getLightRegistry();
 	auto view = registry.view<SpotLightComponent>();
 
-	for (auto [entity, light] : view.each())
+	for(auto [entity, light] : view.each())
 	{
 		auto it = shadowMaps.find(entity);
-		if (it == shadowMaps.end()) continue;
+		if(it == shadowMaps.end()) continue;
 
 		auto* spotShadowMap = it->second;
 		spotShadowMap->bindForWriting();

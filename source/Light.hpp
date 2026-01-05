@@ -79,6 +79,7 @@ private:
 	GLuint pointLightSSBO = 0;
 	GLuint spotLightSSBO = 0;
 
+
 	// Per-light shadow maps with bindless handles
 	std::unordered_map<entt::entity, std::unique_ptr<PointLightShadowMap>> pointLightShadowMaps;
 	std::unordered_map<entt::entity, std::unique_ptr<SpotLightShadowMap>> spotLightShadowMaps;
