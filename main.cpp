@@ -67,7 +67,7 @@ static void setupScene(Renderer& renderer)
 	constexpr vec3 spotColors[] = {
 		vec3(1.0f, 0.0f, 0.0f), // Red
 		vec3(0.0f, 1.0f, 0.0f), // Green
-		vec3(0.0f, 0.0f, 1.0f)  // Blue
+		vec3(0.0f, 0.0f, 1.0f) // Blue
 	};
 	for(int i = 0; i < 3; ++i)
 	{
@@ -130,7 +130,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 
 SDL_AppResult SDL_AppIterate(void* appstate)
 {
-	AppState* state = static_cast<AppState*>(appstate);
+	const auto state = static_cast<AppState*>(appstate);
 
 	if(!state || !state->initialized)
 		return SDL_APP_FAILURE;
@@ -144,7 +144,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
 	if(!appstate || !event)
 		return SDL_APP_FAILURE;
 
-	AppState* state = static_cast<AppState*>(appstate);
+	auto* state = static_cast<AppState*>(appstate);
 
 	switch(event->type)
 	{
@@ -164,15 +164,13 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
 	return SDL_APP_CONTINUE;
 }
 
-void SDL_AppQuit(void* appstate, SDL_AppResult result)
+void SDL_AppQuit(void* appstate, SDL_AppResult /*result*/)
 {
-	AppState* state = static_cast<AppState*>(appstate);
-
-	if(state)
-	{
-		// Renderer destructor handles OpenGL cleanup, window is destroyed here
-		SDL_DestroyWindow(state->window);
-		state->initialized = false;
-		delete state;
-	}
+	if(!appstate)
+		return;
+	auto* state = static_cast<AppState*>(appstate);
+	// Renderer destructor handles OpenGL cleanup, window is destroyed here
+	SDL_DestroyWindow(state->window);
+	state->initialized = false;
+	delete state;
 }
