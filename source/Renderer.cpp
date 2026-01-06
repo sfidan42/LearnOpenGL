@@ -207,25 +207,24 @@ void Renderer::renderShadowPass()
 
 void Renderer::renderPointLightShadows()
 {
-	auto shadowMaps = lightManager->getPointLightShadowMaps();
-	if(shadowMaps.empty()) return;
+	auto& lightRegistry = lightManager->getLightRegistry();
+	if(lightRegistry.storage<PointLightShadowMap>().empty())
+		return;
 
 	glCullFace(GL_FRONT);
 	shadowPointShader->use();
 
-	const float farPlane = PointLightShadowMap::FAR_PLANE;
+	constexpr float farPlane = PointLightShadowMap::FAR_PLANE;
 	shadowPointShader->setFloat("farPlane", farPlane);
 
 	// Get point lights to access positions
-	auto& registry = lightManager->getLightRegistry();
-	auto view = registry.view<PointLightComponent>();
-
+	auto view = lightRegistry.view<PointLightComponent>();
 	for(auto [entity, light] : view.each())
 	{
-		auto it = shadowMaps.find(entity);
-		if(it == shadowMaps.end()) continue;
-
-		it->second->bindForWriting();
+		auto* pShadowMap = lightRegistry.try_get<PointLightShadowMap>(entity);
+		if(!pShadowMap)
+			continue;
+		pShadowMap->bindForWriting();
 
 		shadowPointShader->setVec3("lightPos", light.position);
 
@@ -254,25 +253,24 @@ void Renderer::renderPointLightShadows()
 
 void Renderer::renderSpotLightShadows()
 {
-	auto shadowMaps = lightManager->getSpotLightShadowMaps();
-	if(shadowMaps.empty()) return;
+	auto& lightRegistry = lightManager->getLightRegistry();
+	if(lightRegistry.storage<SpotLightShadowMap>().empty())
+		return;
 
 	glCullFace(GL_FRONT);
 	shadowMapShader->use();
 
 	// Get spot lights to access positions and directions
-	auto& registry = lightManager->getLightRegistry();
-	auto view = registry.view<SpotLightComponent>();
-
+	auto view = lightRegistry.view<SpotLightComponent>();
 	for(auto [entity, light] : view.each())
 	{
-		auto it = shadowMaps.find(entity);
-		if(it == shadowMaps.end()) continue;
+		auto* sShadowMap = lightRegistry.try_get<SpotLightShadowMap>(entity);
+		if(!sShadowMap)
+			continue;
 
-		auto* spotShadowMap = it->second;
-		spotShadowMap->bindForWriting();
+		sShadowMap->bindForWriting();
 
-		mat4 lightSpaceMatrix = spotShadowMap->getLightSpaceMatrix(
+		mat4 lightSpaceMatrix = sShadowMap->getLightSpaceMatrix(
 			light.position,
 			normalize(light.direction),
 			light.outerCutOff,

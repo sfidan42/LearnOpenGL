@@ -1,4 +1,4 @@
-#include "ShadowMap.hpp"
+#include "Shadow.hpp"
 #include <iostream>
 #include <array>
 

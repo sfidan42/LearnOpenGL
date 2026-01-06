@@ -6,7 +6,7 @@
 #include "Components.hpp"
 #include "Light.hpp"
 #include "Skybox.hpp"
-#include "ShadowMap.hpp"
+#include "Shadow.hpp"
 
 class Renderer
 {
@@ -34,7 +34,6 @@ private:
 	Shader* shadowPointShader = nullptr;
 	Skybox* skybox = nullptr;
 	ShadowMap* shadowMap = nullptr;
-
 
 	entt::registry modelRegistry;
 

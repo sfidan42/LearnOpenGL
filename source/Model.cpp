@@ -57,38 +57,10 @@ void Mesh::setup(const vector<Vertex>& vertices, const vector<Index>& indices,
 			normalHandles.push_back(tex.handle);
 	}
 
-	// Create Diffuse Handles SSBO
-	if(!diffuseHandles.empty())
-	{
-		glGenBuffers(1, &diffuseHandlesSSBO);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, diffuseHandlesSSBO);
-		glBufferData(GL_SHADER_STORAGE_BUFFER,
-					 diffuseHandles.size() * sizeof(GLuint64),
-					 diffuseHandles.data(),
-					 GL_STATIC_DRAW);
-	}
-
-	// Create Specular Handles SSBO
-	if(!specularHandles.empty())
-	{
-		glGenBuffers(1, &specularHandlesSSBO);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, specularHandlesSSBO);
-		glBufferData(GL_SHADER_STORAGE_BUFFER,
-					 specularHandles.size() * sizeof(GLuint64),
-					 specularHandles.data(),
-					 GL_STATIC_DRAW);
-	}
-
-	// Create Normal Handles SSBO
-	if(!normalHandles.empty())
-	{
-		glGenBuffers(1, &normalHandlesSSBO);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, normalHandlesSSBO);
-		glBufferData(GL_SHADER_STORAGE_BUFFER,
-					 normalHandles.size() * sizeof(GLuint64),
-					 normalHandles.data(),
-					 GL_STATIC_DRAW);
-	}
+	// Create SSBOs using helper function (eliminates repetitive code)
+	diffuseHandlesSSBO = CreateTextureHandleSSBO(diffuseHandles);
+	specularHandlesSSBO = CreateTextureHandleSSBO(specularHandles);
+	normalHandlesSSBO = CreateTextureHandleSSBO(normalHandles);
 
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
@@ -112,17 +84,17 @@ void Mesh::drawInstanced(const Shader& shader, const vector<mat4>& instanceMatri
 
 void Mesh::bind(const Shader& shader) const
 {
-	// Bind Diffuse Handles SSBO to binding point 2
+	// Bind Diffuse Handles SSBO
 	if(diffuseHandlesSSBO != 0)
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, diffuseHandlesSSBO);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::DiffuseTextures), diffuseHandlesSSBO);
 
-	// Bind Specular Handles SSBO to binding point 3
+	// Bind Specular Handles SSBO
 	if(specularHandlesSSBO != 0)
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, specularHandlesSSBO);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::SpecularTextures), specularHandlesSSBO);
 
-	// Bind Normal Handles SSBO to binding point 4
+	// Bind Normal Handles SSBO
 	if(normalHandlesSSBO != 0)
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, normalHandlesSSBO);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::NormalTextures), normalHandlesSSBO);
 
 	// Set counts
 	shader.setInt("u_numDiffuseTextures", static_cast<int>(diffuseHandles.size()));
@@ -151,7 +123,6 @@ void Mesh::cleanup()
 		glDeleteBuffers(1, &normalHandlesSSBO);
 		normalHandlesSSBO = 0;
 	}
-
 
 	// Delete VAO, VBO, EBO
 	if(VAO != 0)
@@ -280,6 +251,88 @@ bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents
 	return format != -1;
 }
 
+GLuint CreateTextureHandleSSBO(const vector<GLuint64>& handles)
+{
+	if(handles.empty())
+		return 0;
+
+	GLuint ssbo = 0;
+	glGenBuffers(1, &ssbo);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+	glBufferData(GL_SHADER_STORAGE_BUFFER,
+				 handles.size() * sizeof(GLuint64),
+				 handles.data(),
+				 GL_STATIC_DRAW);
+	return ssbo;
+}
+
+bool LoadEmbeddedTextureData(const aiTexture* atex, GLuint& textureID, GLuint64& outHandle)
+{
+	if(!atex)
+		return false;
+
+	glGenTextures(1, &textureID);
+	glBindTexture(GL_TEXTURE_2D, textureID);
+
+	int width = 0, height = 0, nrComponents = 0;
+	unsigned char* data = nullptr;
+	bool dataAllocated = false;
+
+	if(atex->mHeight == 0)
+	{
+		// Compressed image format (PNG/JPEG) inside memory
+		// atex->mWidth stores size in bytes and pcData points to that memory
+		const unsigned int size = atex->mWidth;
+		data = stbi_load_from_memory(
+			reinterpret_cast<const unsigned char*>(atex->pcData),
+			static_cast<int>(size), &width, &height, &nrComponents, 0);
+	}
+	else
+	{
+		// Uncompressed RGBA32 image stored as aiTexel array
+		width = static_cast<int>(atex->mWidth);
+		height = static_cast<int>(atex->mHeight);
+		nrComponents = 4; // aiTexel has r,g,b,a
+		const size_t bufSize = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+		data = static_cast<unsigned char*>(malloc(bufSize));
+		dataAllocated = true;
+		const auto* texels = reinterpret_cast<const aiTexel*>(atex->pcData);
+		for(size_t p = 0; p < static_cast<size_t>(width) * static_cast<size_t>(height); ++p)
+		{
+			data[p * 4 + 0] = texels[p].r;
+			data[p * 4 + 1] = texels[p].g;
+			data[p * 4 + 2] = texels[p].b;
+			data[p * 4 + 3] = texels[p].a;
+		}
+	}
+
+	bool success = false;
+	if(data)
+	{
+		success = ProcessTexture(data, width, height, nrComponents, textureID);
+		if(dataAllocated)
+			free(data);
+		else
+			stbi_image_free(data);
+
+		if(success)
+		{
+			// Get bindless texture handle and make it resident
+			outHandle = glGetTextureHandleARB(textureID);
+			glMakeTextureHandleResidentARB(outHandle);
+		}
+	}
+
+	if(!success)
+	{
+		glDeleteTextures(1, &textureID);
+		textureID = 0;
+		outHandle = 0;
+	}
+
+	return success;
+}
+
 GLuint TextureFromFile(const string& fullPath, GLuint64& outHandle)
 {
 	unsigned int textureID = 0;
@@ -337,18 +390,18 @@ void Model::loadModel(const string& modelPath)
 		cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << endl;
 		return;
 	}
-	// retrieve the directory path of the filepath
-	directory = modelPath.substr(0, modelPath.find_last_of('/'));
+	// retrieve the directory path using std::filesystem
+	directory = fs::path(modelPath).parent_path();
 
 	// process ASSIMP's root node recursively
 	processNode(scene->mRootNode, scene);
 	cout << "Model loaded successfully from: " << modelPath << endl;
 }
 
-void Model::processNode(aiNode* node, const aiScene* scene, const aiMatrix4x4& parentTransform)
+void Model::processNode(const aiNode* node, const aiScene* scene, const aiMatrix4x4& parentTransform)
 {
 	// Combine the current node's transformation with the parent's transformation
-	aiMatrix4x4 nodeTransform = parentTransform * node->mTransformation;
+	const aiMatrix4x4 nodeTransform = parentTransform * node->mTransformation;
 
 	// Process each mesh located at the current node
 	for(unsigned int i = 0; i < node->mNumMeshes; i++)
@@ -368,19 +421,31 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& t
 {
 	// Apply the transformation to the vertices
 	vector<Vertex> vertices;
-	vector<Index> indices; // Declare indices in the correct scope
-	vector<TextureComponent> textures; // Declare textures in the correct scope
+	vector<Index> indices;
+	vector<TextureComponent> textures;
+
+	// Reserve capacity for performance
+	vertices.reserve(mesh->mNumVertices);
+	size_t totalIndices = 0;
+	for(unsigned int i = 0; i < mesh->mNumFaces; i++)
+		totalIndices += mesh->mFaces[i].mNumIndices;
+	indices.reserve(totalIndices);
+
+	// Compute normal matrix (inverse transpose of 3x3) for correct normal transformation
+	// This handles non-uniform scaling correctly
+	aiMatrix3x3 normalMatrix(transform);
+	normalMatrix.Inverse().Transpose();
 
 	for(unsigned int i = 0; i < mesh->mNumVertices; i++)
 	{
 		Vertex vertex{};
 		aiVector3D transformedPosition = transform * mesh->mVertices[i];
 		vertex.Position = vec3(transformedPosition.x, transformedPosition.y, transformedPosition.z);
-		// normals
+		// normals - use normal matrix for correct transformation
 		if(mesh->HasNormals())
 		{
-			aiVector3D transformedNormal = transform * mesh->mNormals[i];
-			vertex.Normal = vec3(transformedNormal.x, transformedNormal.y, transformedNormal.z);
+			aiVector3D transformedNormal = normalMatrix * mesh->mNormals[i];
+			vertex.Normal = normalize(vec3(transformedNormal.x, transformedNormal.y, transformedNormal.z));
 		}
 		// texture coordinates
 		if(mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
@@ -396,8 +461,8 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& t
 		// tangent
 		if(mesh->HasTangentsAndBitangents())
 		{
-			aiVector3D transformedTangent = transform * mesh->mTangents[i];
-			vertex.Tangent = vec3(transformedTangent.x, transformedTangent.y, transformedTangent.z);
+			aiVector3D transformedTangent = normalMatrix * mesh->mTangents[i];
+			vertex.Tangent = normalize(vec3(transformedTangent.x, transformedTangent.y, transformedTangent.z));
 		}
 
 		vertices.push_back(vertex);
@@ -414,7 +479,15 @@ void Model::processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& t
 
 	// Load diffuse/base color textures (try both for compatibility)
 	vector<TextureComponent> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "diffuse", scene);
+	// Also try BASE_COLOR for PBR/glTF models
+	if(diffuseMaps.empty())
+		diffuseMaps = loadMaterialTextures(material, aiTextureType_BASE_COLOR, "diffuse", scene);
+
 	vector<TextureComponent> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "specular", scene);
+	// Also try METALNESS for PBR models (can be used as specular approximation)
+	if(specularMaps.empty())
+		specularMaps = loadMaterialTextures(material, aiTextureType_METALNESS, "specular", scene);
+
 	vector<TextureComponent> normalMaps = loadMaterialTextures(material, aiTextureType_NORMALS, "normal", scene);
 	if(normalMaps.empty())
 		normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "normal", scene);
@@ -461,168 +534,90 @@ vector<TextureComponent> Model::loadMaterialTextures(const aiMaterial* mat, aiTe
 				char* endptr = nullptr;
 				const long texIndexLong = strtol(texPath + 1, &endptr, 10);
 				int texIndex = static_cast<int>(texIndexLong);
-				if(endptr != (texPath + 1) && scene->mTextures && texIndex >= 0 && texIndex < static_cast<int>(scene
-					->
+				if(endptr != (texPath + 1) && scene->mTextures && texIndex >= 0 && texIndex < static_cast<int>(scene->
 					mNumTextures))
 				{
 					const aiTexture* atex = scene->mTextures[texIndex];
+					GLuint textureID = 0;
+					GLuint64 handle = 0;
 
-					unsigned int textureID;
-					glGenTextures(1, &textureID);
-					glBindTexture(GL_TEXTURE_2D, textureID);
-
-					int width = 0, height = 0, nrComponents = 0;
-					unsigned char* data = nullptr;
-					bool dataAllocated = false;
-
-					if(atex->mHeight == 0)
+					if(LoadEmbeddedTextureData(atex, textureID, handle))
 					{
-						// compressed image format (PNG/JPEG) inside memory
-						// atex->mWidth stores size in bytes and pcData points to that memory
-						const unsigned int size = atex->mWidth;
-						data = stbi_load_from_memory(
-							static_cast<unsigned char*>(const_cast<void*>(reinterpret_cast<const void*>(atex->
-								pcData))), static_cast<int>(size), &width, &height, &nrComponents, 0);
-					}
-					else
-					{
-						// uncompressed RGBA32 image stored as aiTexel array
-						width = static_cast<int>(atex->mWidth);
-						height = static_cast<int>(atex->mHeight);
-						nrComponents = 4; // aiTexel has r,g,b,a
-						const size_t bufSize = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
-						data = static_cast<unsigned char*>(malloc(bufSize));
-						dataAllocated = true;
-						const auto texels = reinterpret_cast<aiTexel*>(atex->pcData);
-						for(size_t p = 0; p < static_cast<size_t>(width) * static_cast<size_t>(height); ++p)
-						{
-							data[p * 4 + 0] = texels[p].r;
-							data[p * 4 + 1] = texels[p].g;
-							data[p * 4 + 2] = texels[p].b;
-							data[p * 4 + 3] = texels[p].a;
-						}
-					}
-
-					texture.id = 0;
-					texture.handle = 0;
-					if(data)
-					{
-						if(!ProcessTexture(data, width, height, nrComponents, textureID))
-							cout << "Failed to process embedded texture at path: " << texPath << endl;
-						dataAllocated ? free(data) : stbi_image_free(data);
 						texture.id = textureID;
-
-						// Get bindless texture handle and make it resident
-						texture.handle = glGetTextureHandleARB(textureID);
-						glMakeTextureHandleResidentARB(texture.handle);
+						texture.handle = handle;
+						texture.type = typeName;
+						texture.path = texPath;
+						textures.push_back(texture);
+						registry.emplace<TextureComponent>(registry.create(), texture);
+						continue; // processed embedded texture, go to next
 					}
-
-					texture.type = typeName;
-					texture.path = texPath;
-					textures.push_back(texture);
-					registry.emplace<TextureComponent>(registry.create(), texture);
-					continue; // processed embedded texture, go to next
+					cout << "Failed to process embedded texture at path: " << texPath << endl;
 				}
-				cout << "Embedded texture index out of range: " << texPath << endl;
+				else
+					cout << "Embedded texture index out of range: " << texPath << endl;
 			}
 
-			// Check if texture is embedded in the scene (FBX files often embed textures with paths like "Cardboard_Box.fbm/texture.jpg")
-			const aiTexture* embeddedTex = nullptr;
-			if(scene->mTextures && scene->mNumTextures > 0)
-			{
-				// Search for embedded texture by filename
-				for(unsigned int t = 0; t < scene->mNumTextures; ++t)
-				{
-					const aiTexture* atex = scene->mTextures[t];
-					if(atex->mFilename.length > 0)
-					{
-						// Compare the texture path with the embedded texture filename
-						string embeddedName = string(atex->mFilename.C_Str());
-						string texPathStr = string(str.C_Str());
-
-						// Check if the paths match (exact match or basename match)
-						if(embeddedName == texPathStr ||
-							embeddedName.find(texPathStr) != string::npos ||
-							texPathStr.find(embeddedName) != string::npos)
-						{
-							embeddedTex = atex;
-							break;
-						}
-					}
-				}
-			}
+			// Check if texture is embedded in the scene (FBX files often embed textures)
+			const aiTexture* embeddedTex = findEmbeddedTexture(scene, str.C_Str());
 
 			if(embeddedTex)
 			{
-				// Load embedded texture
-				unsigned int textureID;
-				glGenTextures(1, &textureID);
-				glBindTexture(GL_TEXTURE_2D, textureID);
+				GLuint textureID = 0;
+				GLuint64 handle = 0;
 
-				int width = 0, height = 0, nrComponents = 0;
-				unsigned char* data = nullptr;
-				bool dataAllocated = false;
-
-				if(embeddedTex->mHeight == 0)
+				if(LoadEmbeddedTextureData(embeddedTex, textureID, handle))
 				{
-					// compressed image format (PNG/JPEG) inside memory
-					const unsigned int size = embeddedTex->mWidth;
-					data = stbi_load_from_memory(
-						static_cast<unsigned char*>(const_cast<void*>(reinterpret_cast<const void*>(embeddedTex->
-							pcData))),
-						static_cast<int>(size), &width, &height, &nrComponents, 0);
+					texture.id = textureID;
+					texture.handle = handle;
+					texture.type = typeName;
+					texture.path = str.C_Str();
+					textures.push_back(texture);
+					registry.emplace<TextureComponent>(registry.create(), texture);
 				}
 				else
 				{
-					// uncompressed RGBA32 image stored as aiTexel array
-					width = static_cast<int>(embeddedTex->mWidth);
-					height = static_cast<int>(embeddedTex->mHeight);
-					nrComponents = 4;
-					const size_t bufSize = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
-					data = static_cast<unsigned char*>(malloc(bufSize));
-					dataAllocated = true;
-					const auto texels = reinterpret_cast<aiTexel*>(embeddedTex->pcData);
-					for(size_t p = 0; p < static_cast<size_t>(width) * static_cast<size_t>(height); ++p)
-					{
-						data[p * 4 + 0] = texels[p].r;
-						data[p * 4 + 1] = texels[p].g;
-						data[p * 4 + 2] = texels[p].b;
-						data[p * 4 + 3] = texels[p].a;
-					}
+					cout << "Failed to process embedded texture at path: " << str.C_Str() << endl;
 				}
-
-				texture.id = 0;
-				texture.handle = 0;
-				if(data)
-				{
-					if(!ProcessTexture(data, width, height, nrComponents, textureID))
-						cout << "Failed to process embedded texture at path: " << str.C_Str() << endl;
-					dataAllocated ? free(data) : stbi_image_free(data);
-					texture.id = textureID;
-
-					// Get bindless texture handle and make it resident
-					texture.handle = glGetTextureHandleARB(textureID);
-					glMakeTextureHandleResidentARB(texture.handle);
-				}
-
-				texture.type = typeName;
-				texture.path = str.C_Str();
-				textures.push_back(texture);
-				registry.emplace<TextureComponent>(registry.create(), texture);
 			}
 			else
 			{
 				// fallback: try loading texture from file on disk
-				texture.id = TextureFromFile(this->directory + "/" + str.C_Str(), texture.handle);
+				fs::path fullPath = directory / str.C_Str();
+				texture.id = TextureFromFile(fullPath.string(), texture.handle);
 				texture.type = typeName;
 				texture.path = str.C_Str();
 				textures.push_back(texture);
 				registry.emplace<TextureComponent>(registry.create(), texture);
-				// store it as texture loaded for entire model, to ensure we won't unnecessary load duplicate textures.
 			}
 		}
 	}
 	return textures;
+}
+
+const aiTexture* Model::findEmbeddedTexture(const aiScene* scene, const string& texPath)
+{
+	if(!scene->mTextures || scene->mNumTextures == 0)
+		return nullptr;
+
+	// Search for embedded texture by filename
+	for(unsigned int t = 0; t < scene->mNumTextures; ++t)
+	{
+		const aiTexture* atex = scene->mTextures[t];
+		if(atex->mFilename.length > 0)
+		{
+			// Compare the texture path with the embedded texture filename
+			string embeddedName(atex->mFilename.C_Str());
+
+			// Check if the paths match (exact match or basename match)
+			if(embeddedName == texPath ||
+				embeddedName.find(texPath) != string::npos ||
+				texPath.find(embeddedName) != string::npos)
+			{
+				return atex;
+			}
+		}
+	}
+	return nullptr;
 }
 
 Model::~Model()

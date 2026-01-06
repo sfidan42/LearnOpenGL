@@ -104,8 +104,7 @@ PointLight LightManager::createPointLight(const vec3& position, const vec3& colo
 	auto& comp = lightRegistry.emplace<PointLightComponent>(lightEnt, lightComp);
 
 	// Create shadow map for this light
-	createPointLightShadowMap(lightEnt);
-	comp.shadowMapHandle = pointLightShadowHandles[lightEnt];
+	comp.shadowMapHandle = createPointLightShadowMap(lightEnt);
 
 	return {comp, lightEnt};
 }
@@ -132,8 +131,7 @@ SpotLight LightManager::createSpotLight(const vec3& position, const vec3& direct
 	auto& comp = lightRegistry.emplace<SpotLightComponent>(lightEnt, lightComp);
 
 	// Create shadow map for this light
-	createSpotLightShadowMap(lightEnt);
-	comp.shadowMapHandle = spotLightShadowHandles[lightEnt];
+	comp.shadowMapHandle = createSpotLightShadowMap(lightEnt);
 
 	return {comp, lightEnt};
 }
@@ -162,52 +160,19 @@ void LightManager::deleteSpotLight(const SpotLight& light)
 	syncSpotLights(lightRegistry, light.lightEntity);
 }
 
-std::vector<PointLightComponent> LightManager::getPointLights() const
-{
-	std::vector<PointLightComponent> lights;
-	const auto& view = lightRegistry.view<PointLightComponent>();
-	lights.reserve(view.size());
-	view.each([&](const PointLightComponent& light) { lights.push_back(light); });
-	return lights;
-}
-
-std::vector<SpotLightComponent> LightManager::getSpotLights() const
-{
-	std::vector<SpotLightComponent> lights;
-	const auto& view = lightRegistry.view<SpotLightComponent>();
-	lights.reserve(view.size());
-	view.each([&](const SpotLightComponent& light) { lights.push_back(light); });
-	return lights;
-}
-
-std::unordered_map<entt::entity, PointLightShadowMap*> LightManager::getPointLightShadowMaps()
-{
-	std::unordered_map<entt::entity, PointLightShadowMap*> result;
-	for(auto& [entity, shadowMap] : pointLightShadowMaps)
-		result[entity] = shadowMap.get();
-	return result;
-}
-
-std::unordered_map<entt::entity, SpotLightShadowMap*> LightManager::getSpotLightShadowMaps()
-{
-	std::unordered_map<entt::entity, SpotLightShadowMap*> result;
-	for(auto& [entity, shadowMap] : spotLightShadowMaps)
-		result[entity] = shadowMap.get();
-	return result;
-}
-
 void LightManager::updateSpotLightMatrices()
 {
-	auto view = lightRegistry.view<SpotLightComponent>();
+	const auto view = lightRegistry.view<SpotLightComponent>();
 	bool hasLights = false;
 
 	for(auto [entity, light] : view.each())
 	{
 		hasLights = true;
-		auto it = spotLightShadowMaps.find(entity);
-		if(it != spotLightShadowMaps.end())
+
+		auto* spotShadowMap = lightRegistry.try_get<SpotLightShadowMap>(entity);
+		if (spotShadowMap)
 		{
-			light.lightSpaceMatrix = it->second->getLightSpaceMatrix(
+			light.lightSpaceMatrix = spotShadowMap->getLightSpaceMatrix(
 				light.position,
 				normalize(light.direction),
 				light.outerCutOff,
@@ -218,9 +183,7 @@ void LightManager::updateSpotLightMatrices()
 
 	// Force sync the SSBO so the shader sees the updated matrices
 	if(hasLights)
-	{
 		syncSpotLights(lightRegistry, entt::null);
-	}
 }
 
 void LightManager::setupLightTracking()
@@ -251,7 +214,8 @@ void LightManager::syncPointLights(entt::registry& /*registry*/, entt::entity /*
 		pointLights.data(),
 		GL_DYNAMIC_DRAW
 	);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, pointLightSSBO);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::PointLights), pointLightSSBO);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 void LightManager::syncSpotLights(entt::registry& /*registry*/, entt::entity /*entity*/)
@@ -272,7 +236,7 @@ void LightManager::syncSpotLights(entt::registry& /*registry*/, entt::entity /*e
 		spotLights.data(),
 		GL_DYNAMIC_DRAW
 	);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, spotLightSSBO);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::SpotLights), spotLightSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
@@ -294,44 +258,34 @@ void LightManager::syncSunLight() const
 	cachedSkyShader.setVec3("sunLight.specular", sunLight.specular);
 }
 
-void LightManager::createPointLightShadowMap(entt::entity entity)
+GLuint64 LightManager::createPointLightShadowMap(const entt::entity entity)
 {
-	auto shadowMap = std::make_unique<PointLightShadowMap>(512);
-	GLuint64 handle = glGetTextureHandleARB(shadowMap->getDepthCubemap());
+	const auto& shadowMap = lightRegistry.emplace<PointLightShadowMap>(entity, 512);
+	const GLuint64 handle = glGetTextureHandleARB(shadowMap.getDepthCubemap());
 	glMakeTextureHandleResidentARB(handle);
-
-	pointLightShadowMaps[entity] = std::move(shadowMap);
-	pointLightShadowHandles[entity] = handle;
+	return handle;
 }
 
-void LightManager::createSpotLightShadowMap(entt::entity entity)
+GLuint64 LightManager::createSpotLightShadowMap(const entt::entity entity)
 {
-	auto shadowMap = std::make_unique<SpotLightShadowMap>(1024, 1024);
-	GLuint64 handle = glGetTextureHandleARB(shadowMap->getDepthTexture());
+	const auto& shadowMap = lightRegistry.emplace<SpotLightShadowMap>(entity, 1024, 1024);
+	const GLuint64 handle = glGetTextureHandleARB(shadowMap.getDepthTexture());
 	glMakeTextureHandleResidentARB(handle);
-
-	spotLightShadowMaps[entity] = std::move(shadowMap);
-	spotLightShadowHandles[entity] = handle;
+	return handle;
 }
 
 void LightManager::destroyPointLightShadowMap(entt::entity entity)
 {
-	auto it = pointLightShadowHandles.find(entity);
-	if(it != pointLightShadowHandles.end())
-	{
-		glMakeTextureHandleNonResidentARB(it->second);
-		pointLightShadowHandles.erase(it);
-	}
-	pointLightShadowMaps.erase(entity);
+	GLuint64& handle = lightRegistry.get<PointLightComponent>(entity).shadowMapHandle;
+	handle = 0;
+	glMakeTextureHandleResidentARB(handle);
+	lightRegistry.remove<PointLightShadowMap>(entity);
 }
 
 void LightManager::destroySpotLightShadowMap(entt::entity entity)
 {
-	auto it = spotLightShadowHandles.find(entity);
-	if(it != spotLightShadowHandles.end())
-	{
-		glMakeTextureHandleNonResidentARB(it->second);
-		spotLightShadowHandles.erase(it);
-	}
-	spotLightShadowMaps.erase(entity);
+	GLuint64& handle = lightRegistry.get<SpotLightComponent>(entity).shadowMapHandle;
+	handle = 0;
+	glMakeTextureHandleResidentARB(handle);
+	lightRegistry.remove<SpotLightShadowMap>(entity);
 }

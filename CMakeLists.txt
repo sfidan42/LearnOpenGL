@@ -11,6 +11,7 @@ add_executable(${PNAME} main.cpp)
 file(GLOB_RECURSE PROJECT_SOURCES ${CMAKE_SOURCE_DIR}/source/*.cpp)
 target_sources(${PNAME} PRIVATE ${PROJECT_SOURCES})
 
+set(OpenGL_GL_PREFERENCE GLVND)
 find_package(OpenGL REQUIRED)
 
 add_library(glad STATIC vendored/glad/src/glad.c)

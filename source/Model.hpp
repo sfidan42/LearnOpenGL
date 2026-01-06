@@ -3,12 +3,15 @@
 #include <assimp/scene.h>
 #include <string>
 #include <vector>
+#include <filesystem>
 #include "Shader.hpp"
 #include <iostream>
 #include "Primitives.hpp"
 #include <entt/entity/registry.hpp>
 
 struct TextureComponent;
+
+namespace fs = std::filesystem;
 
 class Mesh
 {
@@ -49,6 +52,12 @@ private:
 bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID);
 GLuint TextureFromFile(const string& fullPath, GLuint64& outHandle);
 
+// Helper to load embedded texture from aiTexture* (eliminates code duplication)
+bool LoadEmbeddedTextureData(const aiTexture* atex, GLuint& textureID, GLuint64& outHandle);
+
+// Helper to create SSBO from texture handles
+GLuint CreateTextureHandleSSBO(const vector<GLuint64>& handles);
+
 class Model
 {
 public:
@@ -67,10 +76,14 @@ public:
 
 private:
 	void loadModel(const string& modelPath);
-	void processNode(aiNode* node, const aiScene* scene, const aiMatrix4x4& parentTransform = aiMatrix4x4());
+	void processNode(const aiNode* node, const aiScene* scene, const aiMatrix4x4& parentTransform = aiMatrix4x4());
 	void processMesh(aiMesh* mesh, const aiScene* scene, const aiMatrix4x4& transform);
 	vector<TextureComponent> loadMaterialTextures(const aiMaterial* mat, aiTextureType type,
 												  const string& typeName, const aiScene* scene);
-	string directory;
+
+	// Find embedded texture by path in scene
+	static const aiTexture* findEmbeddedTexture(const aiScene* scene, const string& texPath) ;
+
+	fs::path directory;
 	entt::registry registry;
 };
