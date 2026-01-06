@@ -42,7 +42,7 @@ bool Renderer::init(SDL_Window* sdlWindow)
 	}
 
 	SDL_GL_MakeCurrent(window, glContext);
-	SDL_SetWindowRelativeMouseMode(window, true);
+	// Mouse capture is now controlled by focus mode (double-click to focus)
 
 	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(SDL_GL_GetProcAddress)))
 	{
@@ -118,7 +118,6 @@ bool Renderer::init(SDL_Window* sdlWindow)
 	mainShader->use();
 	mainShader->setInt("shadowMap", 5); // Use texture unit 5 for shadow map
 
-
 	skybox = new Skybox();
 
 	const string faces[6] = {
@@ -178,33 +177,68 @@ void Renderer::handleEvent(const SDL_Event& event)
 			camera.setAspect(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
 			break;
 
+		case SDL_EVENT_MOUSE_BUTTON_DOWN:
+			// Double-click to enter focus mode
+			if(event.button.button == SDL_BUTTON_LEFT && event.button.clicks == 2)
+			{
+				if(!isFocused)
+				{
+					isFocused = true;
+					SDL_SetWindowRelativeMouseMode(window, true);
+				}
+			}
+			break;
+
 		case SDL_EVENT_KEY_DOWN:
 			if(!event.key.repeat)
 			{
 				switch(event.key.scancode)
 				{
-					case SDL_SCANCODE_W: camera.speed.z += 1.0f; break;
-					case SDL_SCANCODE_S: camera.speed.z -= 1.0f; break;
-					case SDL_SCANCODE_A: camera.speed.x -= 1.0f; break;
-					case SDL_SCANCODE_D: camera.speed.x += 1.0f; break;
+					case SDL_SCANCODE_Q:
+						// Exit focus mode
+						if(isFocused)
+						{
+							isFocused = false;
+							SDL_SetWindowRelativeMouseMode(window, false);
+						}
+						break;
+					case SDL_SCANCODE_W:
+						if(isFocused) camera.speed.z += 1.0f;
+						break;
+					case SDL_SCANCODE_S:
+						if(isFocused) camera.speed.z -= 1.0f;
+						break;
+					case SDL_SCANCODE_A:
+						if(isFocused) camera.speed.x -= 1.0f;
+						break;
+					case SDL_SCANCODE_D:
+						if(isFocused) camera.speed.x += 1.0f;
+						break;
 					default: break;
 				}
 			}
 			break;
 
 		case SDL_EVENT_KEY_UP:
-			switch(event.key.scancode)
+			if(isFocused)
 			{
-				case SDL_SCANCODE_W: camera.speed.z -= 1.0f; break;
-				case SDL_SCANCODE_S: camera.speed.z += 1.0f; break;
-				case SDL_SCANCODE_A: camera.speed.x += 1.0f; break;
-				case SDL_SCANCODE_D: camera.speed.x -= 1.0f; break;
-				default: break;
+				switch(event.key.scancode)
+				{
+					case SDL_SCANCODE_W: camera.speed.z -= 1.0f; break;
+					case SDL_SCANCODE_S: camera.speed.z += 1.0f; break;
+					case SDL_SCANCODE_A: camera.speed.x += 1.0f; break;
+					case SDL_SCANCODE_D: camera.speed.x -= 1.0f; break;
+					default: break;
+				}
 			}
 			break;
 
 		case SDL_EVENT_MOUSE_MOTION:
-			camera.mouse(event.motion.xrel, -event.motion.yrel);
+			// Only process mouse motion when focused
+			if(isFocused)
+			{
+				camera.mouse(event.motion.xrel, -event.motion.yrel);
+			}
 			break;
 
 		default:
@@ -375,8 +409,10 @@ void Renderer::renderScene()
 {
 	// Restore viewport to window size
 	glViewport(0, 0, windowWidth, windowHeight);
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glDisable(GL_CULL_FACE);
 
 	camera.send(*mainShader, *skyboxShader);
 
@@ -385,7 +421,7 @@ void Renderer::renderScene()
 
 	mainShader->use();
 
-	// Point and spot light shadow maps are now handled via bindless textures
+	// Point and spotlight shadow maps are now handled via bindless textures
 	// stored directly in the light SSBOs - no need to bind them here
 
 	const auto modelView = modelRegistry.view<ModelComponent>();
@@ -395,4 +431,6 @@ void Renderer::renderScene()
 	});
 
 	skybox->draw(*skyboxShader);
+
+	glEnable(GL_CULL_FACE);
 }

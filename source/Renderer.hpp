@@ -47,4 +47,5 @@ private:
 	int windowHeight = 720;
 
 	float lastTime = 0.0f;
+	bool isFocused = false;
 };

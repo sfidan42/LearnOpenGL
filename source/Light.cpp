@@ -222,7 +222,7 @@ void LightManager::syncSpotlights(entt::registry& /*registry*/, entt::entity /*e
 {
 	cachedMainShader.use();
 	const uint32_t sLightsCount = lightRegistry.view<SpotlightComponent>().size();
-	cachedMainShader.setInt("u_numSpotlights", sLightsCount);
+	cachedMainShader.setInt("u_numSpotLights", sLightsCount);
 
 	vector<SpotlightComponent> spotLights;
 	spotLights.reserve(sLightsCount);

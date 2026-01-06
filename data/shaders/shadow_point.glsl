@@ -30,7 +30,7 @@ void main()
         gl_Layer = face; // built-in variable that specifies which face we render to
         for (int i = 0; i < 3; ++i)
         {
-            GeoFragPos = vec4(FragPos[i], 1.0);
+            GeoFragPos = vec4(FragPos[i].xyz, 1.0);
             gl_Position = shadowMatrices[face] * GeoFragPos;
             EmitVertex();
         }
@@ -48,12 +48,6 @@ uniform float farPlane;
 
 void main()
 {
-    // Calculate distance from light to fragment
     float lightDistance = length(GeoFragPos.xyz - lightPos);
-
-    // Map to [0, 1] range by dividing by far plane
-    lightDistance = lightDistance / farPlane;
-
-    // Write as depth
-    gl_FragDepth = lightDistance;
+    gl_FragDepth = lightDistance / farPlane;
 }
