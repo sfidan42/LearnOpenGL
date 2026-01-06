@@ -224,10 +224,14 @@ void Renderer::handleEvent(const SDL_Event& event)
 			{
 				switch(event.key.scancode)
 				{
-					case SDL_SCANCODE_W: camera.speed.z -= 1.0f; break;
-					case SDL_SCANCODE_S: camera.speed.z += 1.0f; break;
-					case SDL_SCANCODE_A: camera.speed.x += 1.0f; break;
-					case SDL_SCANCODE_D: camera.speed.x -= 1.0f; break;
+					case SDL_SCANCODE_W: camera.speed.z -= 1.0f;
+						break;
+					case SDL_SCANCODE_S: camera.speed.z += 1.0f;
+						break;
+					case SDL_SCANCODE_A: camera.speed.x += 1.0f;
+						break;
+					case SDL_SCANCODE_D: camera.speed.x -= 1.0f;
+						break;
 					default: break;
 				}
 			}
@@ -290,8 +294,13 @@ void Renderer::renderShadowPass()
 {
 	shadowMap->bindForWriting();
 
-	// Use front face culling to reduce shadow acne
-	glCullFace(GL_FRONT);
+	// Use back-face culling so front faces are rendered to shadow map
+	// This properly shadows objects below surfaces (floors, roofs, etc.)
+	glCullFace(GL_BACK);
+
+	// Enable polygon offset to reduce shadow acne and light leakage
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(2.0f, 4.0f);
 
 	shadowMapShader->use();
 
@@ -312,8 +321,8 @@ void Renderer::renderShadowPass()
 		modelComp.drawInstanced(*shadowMapShader);
 	});
 
-	// Reset to back face culling
-	glCullFace(GL_BACK);
+	// Disable polygon offset
+	glDisable(GL_POLYGON_OFFSET_FILL);
 
 	// Unbind shadow framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -325,7 +334,13 @@ void Renderer::renderPointLightShadows()
 	if(lightRegistry.storage<PointLightShadowMap>().empty())
 		return;
 
-	glCullFace(GL_FRONT);
+	// Use back-face culling so front faces are rendered to shadow map
+	glCullFace(GL_BACK);
+
+	// Enable polygon offset to reduce light leakage
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(2.0f, 4.0f);
+
 	shadowPointShader->use();
 
 	constexpr float farPlane = PointLightShadowMap::FAR_PLANE;
@@ -361,7 +376,9 @@ void Renderer::renderPointLightShadows()
 		});
 	}
 
-	glCullFace(GL_BACK);
+	// Disable polygon offset
+	glDisable(GL_POLYGON_OFFSET_FILL);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -371,7 +388,14 @@ void Renderer::renderSpotlightShadows()
 	if(lightRegistry.storage<SpotlightShadowMap>().empty())
 		return;
 
-	glCullFace(GL_FRONT);
+	// Use back-face culling so front faces are rendered to shadow map
+	glCullFace(GL_BACK);
+
+	// Enable polygon offset to reduce light leakage
+	// Higher values needed for spotlights to prevent leakage through thin geometry
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(4.0f, 8.0f);
+
 	shadowMapShader->use();
 
 	// Get Spotlights to access positions and directions
@@ -400,10 +424,11 @@ void Renderer::renderSpotlightShadows()
 		});
 	}
 
-	glCullFace(GL_BACK);
+	// Disable polygon offset
+	glDisable(GL_POLYGON_OFFSET_FILL);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
-
 
 void Renderer::renderScene()
 {
@@ -411,8 +436,6 @@ void Renderer::renderScene()
 	glViewport(0, 0, windowWidth, windowHeight);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	glDisable(GL_CULL_FACE);
 
 	camera.send(*mainShader, *skyboxShader);
 
@@ -431,6 +454,4 @@ void Renderer::renderScene()
 	});
 
 	skybox->draw(*skyboxShader);
-
-	glEnable(GL_CULL_FACE);
 }

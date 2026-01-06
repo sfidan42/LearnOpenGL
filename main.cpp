@@ -34,10 +34,9 @@ static void setupScene(Renderer& renderer)
 	{
 		backpackTransforms[i].position = backpackPositions[i];
 		backpackTransforms[i].scale = vec3(0.2f);
-		float angle = 20.0f * i; // degrees
+		const float angle = 20.0f * i; // degrees
 		auto axis = vec3(1.0f, 0.3f, 0.5f);
-		axis = normalize(axis);
-		quat q = angleAxis(radians(angle), axis);
+		quat q = angleAxis(radians(angle), normalize(axis));
 		backpackTransforms[i].rotation = eulerAngles(q);
 	}
 

@@ -268,7 +268,7 @@ GLuint64 LightManager::createPointLightShadowMap(const entt::entity entity)
 
 GLuint64 LightManager::createSpotlightShadowMap(const entt::entity entity)
 {
-	const auto& shadowMap = lightRegistry.emplace<SpotlightShadowMap>(entity, 1024, 1024);
+	const auto& shadowMap = lightRegistry.emplace<SpotlightShadowMap>(entity, 2048, 2048);
 	const GLuint64 handle = glGetTextureHandleARB(shadowMap.getDepthTexture());
 	glMakeTextureHandleResidentARB(handle);
 	return handle;

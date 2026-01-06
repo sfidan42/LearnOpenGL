@@ -314,7 +314,8 @@ float SpotShadowCalculation(SpotLight light, vec3 fragPos, vec3 normal, vec3 lig
         return 0.0;
 
     // Calculate bias based on surface angle
-    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
+    // Reduced bias since we use polygon offset in shadow rendering
+    float bias = max(0.002 * (1.0 - dot(normal, lightDir)), 0.0005);
 
     float currentDepth = projCoords.z - bias;
 
