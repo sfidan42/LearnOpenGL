@@ -2,7 +2,7 @@
 #include <glm/ext/quaternion_trigonometric.hpp>
 #include <glm/detail/type_quat.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include "callbacks.hpp"
+#include "Camera.hpp"
 #include <stb_image.h>
 #include <iostream>
 #include <algorithm>
@@ -18,37 +18,33 @@ Renderer::~Renderer()
 	delete shadowPointShader;
 	delete skybox;
 	delete shadowMap;
-	if(window)
-		glfwDestroyWindow(window);
-	glfwTerminate();
+	if(glContext)
+		SDL_GL_DestroyContext(glContext);
+	// Note: SDL_Window is owned by AppState in main.cpp, not by Renderer
 }
 
-bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath)
+bool Renderer::init(SDL_Window* sdlWindow)
 {
-	setenv("__NV_PRIME_RENDER_OFFLOAD", "1", 1);
-	setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 1);
+	window = sdlWindow;
 
-	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_SAMPLES, 4); // MSAA
+	// Set OpenGL attributes before creating context
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); // MSAA
 
-	window = glfwCreateWindow(1200, 720, "LearnOpenGL", nullptr, nullptr);
-	if(window == nullptr)
+	glContext = SDL_GL_CreateContext(window);
+	if(!glContext)
 	{
-		cout << "Failed to create GLFW window" << endl;
-		glfwTerminate();
+		cout << "Failed to create OpenGL context: " << SDL_GetError() << endl;
 		return false;
 	}
 
-	glfwMakeContextCurrent(window);
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	glfwSetKeyCallback(window, key_callback);
-	glfwSetCursorPosCallback(window, mouse_callback);
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	SDL_GL_MakeCurrent(window, glContext);
+	SDL_SetWindowRelativeMouseMode(window, true);
 
-	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
+	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(SDL_GL_GetProcAddress)))
 	{
 		cout << "Failed to initialize GLAD" << endl;
 		return false;
@@ -70,14 +66,20 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 		return false;
 	}
 
+	// Get window size
+	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+
 	glEnable(GL_DEPTH_TEST);
-	glViewport(0, 0, 1200, 720);
-	g_camera.setAspect(1200, 720);
+	glViewport(0, 0, windowWidth, windowHeight);
+	camera.setAspect(windowWidth, windowHeight);
 
 	glEnable(GL_CULL_FACE);
 
 	// My redundant MSAA enable call
 	glEnable(GL_MULTISAMPLE);
+
+	const string mainShaderPath = "shaders/main.glsl";
+	const string skyboxShaderPath = "shaders/skybox.glsl";
 
 	mainShader = new Shader();
 	if(!mainShader->load(mainShaderPath))
@@ -101,7 +103,7 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 		return false;
 	}
 
-	// Load point light shadow shader (with geometry shader for cubemap)
+	// Load point light shadow shader (with geometry shader for cube map)
 	shadowPointShader = new Shader();
 	if(!shadowPointShader->load("shaders/shadow_point.glsl"))
 	{
@@ -141,35 +143,113 @@ bool Renderer::init(const string& mainShaderPath, const string& skyboxShaderPath
 	return true;
 }
 
-void Renderer::run()
+void Renderer::iterate()
 {
-	assert(window != nullptr && "Window is not initialized");
+	const auto currentTime = static_cast<float>(SDL_GetTicks()) / 1000.0f;
+	const float deltaTime = currentTime - lastTime;
+	lastTime = currentTime;
 
-	float lastTime = 0.0f;
+	lightManager->update(deltaTime);
+	camera.update(deltaTime);
 
-	while(!glfwWindowShouldClose(window))
+	// Update light space matrices before shadow rendering
+	lightManager->updateSpotlightMatrices();
+
+	// ========== PASS 1: Shadow Maps ==========
+	renderShadowPass(); // Directional light
+	renderPointLightShadows(); // Point lights (cube maps)
+	renderSpotlightShadows(); // Spotlights (2D)
+
+	// ========== PASS 2: Main Scene ==========
+	renderScene();
+
+	SDL_GL_SwapWindow(window);
+}
+
+void Renderer::handleEvent(const SDL_Event& event)
+{
+	switch(event.type)
 	{
-		const auto currentTime = static_cast<float>(glfwGetTime());
-		const float deltaTime = currentTime - lastTime;
-		lastTime = currentTime;
+		case SDL_EVENT_WINDOW_RESIZED:
+		case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+			windowWidth = event.window.data1;
+			windowHeight = event.window.data2;
+			glViewport(0, 0, windowWidth, windowHeight);
+			camera.setAspect(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
+			break;
 
-		lightManager->update(deltaTime);
-		g_camera.update(deltaTime);
+		case SDL_EVENT_KEY_DOWN:
+			if(!event.key.repeat)
+			{
+				switch(event.key.scancode)
+				{
+					case SDL_SCANCODE_W: camera.speed.z += 1.0f; break;
+					case SDL_SCANCODE_S: camera.speed.z -= 1.0f; break;
+					case SDL_SCANCODE_A: camera.speed.x -= 1.0f; break;
+					case SDL_SCANCODE_D: camera.speed.x += 1.0f; break;
+					default: break;
+				}
+			}
+			break;
 
-		// Update light space matrices before shadow rendering
-		lightManager->updateSpotLightMatrices();
+		case SDL_EVENT_KEY_UP:
+			switch(event.key.scancode)
+			{
+				case SDL_SCANCODE_W: camera.speed.z -= 1.0f; break;
+				case SDL_SCANCODE_S: camera.speed.z += 1.0f; break;
+				case SDL_SCANCODE_A: camera.speed.x += 1.0f; break;
+				case SDL_SCANCODE_D: camera.speed.x -= 1.0f; break;
+				default: break;
+			}
+			break;
 
-		// ========== PASS 1: Shadow Maps ==========
-		renderShadowPass(); // Directional light
-		renderPointLightShadows(); // Point lights (cubemaps)
-		renderSpotLightShadows(); // Spot lights (2D)
+		case SDL_EVENT_MOUSE_MOTION:
+			camera.mouse(event.motion.xrel, -event.motion.yrel);
+			break;
 
-		// ========== PASS 2: Main Scene ==========
-		renderScene();
-
-		glfwSwapBuffers(window);
-		glfwPollEvents();
+		default:
+			break;
 	}
+}
+
+void Renderer::loadModel(const string& modelPath, const TransformComponent& transform)
+{
+	// TODO: some models need glCullFace(GL_FRONT), others GL_BACK or disabled culling
+	entt::entity modelEntity = entt::null;
+
+	// 1. Find or create the model resource entity
+	auto modelView = modelRegistry.view<ModelComponent>();
+	for(auto e : modelView)
+	{
+		if(modelView.get<ModelComponent>(e).path == modelPath)
+		{
+			modelEntity = e;
+			break;
+		}
+	}
+
+	if(modelEntity == entt::null)
+	{
+		const string base(DATA_DIR);
+		const string fullPath = base + "/models/" + modelPath;
+
+		modelEntity = modelRegistry.create();
+		modelRegistry.emplace<ModelComponent>(
+			modelEntity,
+			modelPath,
+			Model(fullPath)
+		);
+	}
+
+	// 2. Create an instance entity
+	const entt::entity instance = modelRegistry.create();
+	modelRegistry.emplace<InstanceComponent>(instance, modelEntity);
+	modelRegistry.emplace<TransformComponent>(instance, transform);
+	// TODO: when scale is different thatn (1,1,1), position and rotation may need adjustment
+
+	// 3. Bake the transform and add it to the ModelComponent's instanceMatrices
+	auto& modelComp = modelRegistry.get<ModelComponent>(modelEntity);
+	modelComp.instanceMatrices.emplace_back(transform.bake());
 }
 
 void Renderer::renderShadowPass()
@@ -251,20 +331,20 @@ void Renderer::renderPointLightShadows()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Renderer::renderSpotLightShadows()
+void Renderer::renderSpotlightShadows()
 {
 	auto& lightRegistry = lightManager->getLightRegistry();
-	if(lightRegistry.storage<SpotLightShadowMap>().empty())
+	if(lightRegistry.storage<SpotlightShadowMap>().empty())
 		return;
 
 	glCullFace(GL_FRONT);
 	shadowMapShader->use();
 
-	// Get spot lights to access positions and directions
-	auto view = lightRegistry.view<SpotLightComponent>();
+	// Get Spotlights to access positions and directions
+	auto view = lightRegistry.view<SpotlightComponent>();
 	for(auto [entity, light] : view.each())
 	{
-		auto* sShadowMap = lightRegistry.try_get<SpotLightShadowMap>(entity);
+		auto* sShadowMap = lightRegistry.try_get<SpotlightShadowMap>(entity);
 		if(!sShadowMap)
 			continue;
 
@@ -290,6 +370,7 @@ void Renderer::renderSpotLightShadows()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+
 void Renderer::renderScene()
 {
 	// Restore viewport to window size
@@ -297,7 +378,7 @@ void Renderer::renderScene()
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	g_camera.send(*mainShader, *skyboxShader);
+	camera.send(*mainShader, *skyboxShader);
 
 	// Bind directional shadow map for reading
 	shadowMap->bindForReading(GL_TEXTURE5);
@@ -314,45 +395,4 @@ void Renderer::renderScene()
 	});
 
 	skybox->draw(*skyboxShader);
-}
-
-
-void Renderer::loadModel(const string& modelPath, const TransformComponent& transform)
-{
-	// TODO: some models need glCullFace(GL_FRONT), others GL_BACK or disabled culling
-	entt::entity modelEntity = entt::null;
-
-	// 1. Find or create the model resource entity
-	auto modelView = modelRegistry.view<ModelComponent>();
-	for(auto e : modelView)
-	{
-		if(modelView.get<ModelComponent>(e).path == modelPath)
-		{
-			modelEntity = e;
-			break;
-		}
-	}
-
-	if(modelEntity == entt::null)
-	{
-		const string base(DATA_DIR);
-		const string fullPath = base + "/models/" + modelPath;
-
-		modelEntity = modelRegistry.create();
-		modelRegistry.emplace<ModelComponent>(
-			modelEntity,
-			modelPath,
-			Model(fullPath)
-		);
-	}
-
-	// 2. Create an instance entity
-	const entt::entity instance = modelRegistry.create();
-	modelRegistry.emplace<InstanceComponent>(instance, modelEntity);
-	modelRegistry.emplace<TransformComponent>(instance, transform);
-	// TODO: when scale is different thatn (1,1,1), position and rotation may need adjustment
-
-	// 3. Bake the transform and add it to the ModelComponent's instanceMatrices
-	auto& modelComp = modelRegistry.get<ModelComponent>(modelEntity);
-	modelComp.instanceMatrices.emplace_back(transform.bake());
 }

@@ -80,9 +80,9 @@ mat4 ShadowMap::getLightSpaceMatrix(const vec3& lightDir, const float orthoSize,
 	return lightProjection * lightView;
 }
 
-// ==================== SpotLightShadowMap ====================
+// ==================== SpotlightShadowMap ====================
 
-SpotLightShadowMap::SpotLightShadowMap(unsigned int width, unsigned int height)
+SpotlightShadowMap::SpotlightShadowMap(unsigned int width, unsigned int height)
 : shadowWidth(width), shadowHeight(height)
 {
 	glGenFramebuffers(1, &depthMapFBO);
@@ -115,7 +115,7 @@ SpotLightShadowMap::SpotLightShadowMap(unsigned int width, unsigned int height)
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-SpotLightShadowMap::~SpotLightShadowMap()
+SpotlightShadowMap::~SpotlightShadowMap()
 {
 	if(depthTexture)
 		glDeleteTextures(1, &depthTexture);
@@ -123,7 +123,7 @@ SpotLightShadowMap::~SpotLightShadowMap()
 		glDeleteFramebuffers(1, &depthMapFBO);
 }
 
-SpotLightShadowMap::SpotLightShadowMap(SpotLightShadowMap&& other) noexcept
+SpotlightShadowMap::SpotlightShadowMap(SpotlightShadowMap&& other) noexcept
 : depthMapFBO(other.depthMapFBO), depthTexture(other.depthTexture),
   shadowWidth(other.shadowWidth), shadowHeight(other.shadowHeight)
 {
@@ -131,7 +131,7 @@ SpotLightShadowMap::SpotLightShadowMap(SpotLightShadowMap&& other) noexcept
 	other.depthTexture = 0;
 }
 
-SpotLightShadowMap& SpotLightShadowMap::operator=(SpotLightShadowMap&& other) noexcept
+SpotlightShadowMap& SpotlightShadowMap::operator=(SpotlightShadowMap&& other) noexcept
 {
 	if(this != &other)
 	{
@@ -151,20 +151,20 @@ SpotLightShadowMap& SpotLightShadowMap::operator=(SpotLightShadowMap&& other) no
 	return *this;
 }
 
-void SpotLightShadowMap::bindForWriting() const
+void SpotlightShadowMap::bindForWriting() const
 {
 	glViewport(0, 0, shadowWidth, shadowHeight);
 	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 	glClear(GL_DEPTH_BUFFER_BIT);
 }
 
-void SpotLightShadowMap::bindForReading(GLenum textureUnit) const
+void SpotlightShadowMap::bindForReading(GLenum textureUnit) const
 {
 	glActiveTexture(textureUnit);
 	glBindTexture(GL_TEXTURE_2D, depthTexture);
 }
 
-mat4 SpotLightShadowMap::getLightSpaceMatrix(const vec3& position, const vec3& direction,
+mat4 SpotlightShadowMap::getLightSpaceMatrix(const vec3& position, const vec3& direction,
 											 float outerCutOff, float nearPlane, float farPlane) const
 {
 	// FOV should be at least as wide as the outer cone angle (outerCutOff is cos of angle)

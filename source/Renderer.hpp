@@ -1,7 +1,9 @@
 #pragma once
 #include <glad/glad.h>
-#include <GLFW/glfw3.h>
+#include <SDL3/SDL.h>
 #include <vector>
+
+#include "Camera.hpp"
 #include "Shader.hpp"
 #include "Components.hpp"
 #include "Light.hpp"
@@ -14,8 +16,9 @@ public:
 	Renderer() = default;
 	~Renderer();
 
-	bool init(const string& mainShaderPath, const string& skyboxShaderPath);
-	void run();
+	bool init(SDL_Window* sdlWindow);
+	void iterate();
+	void handleEvent(const SDL_Event& event);
 
 	void loadModel(const string& modelPath, const TransformComponent& transform);
 
@@ -24,10 +27,11 @@ public:
 private:
 	void renderShadowPass();
 	void renderPointLightShadows();
-	void renderSpotLightShadows();
+	void renderSpotlightShadows();
 	void renderScene();
 
-	GLFWwindow* window = nullptr;
+	SDL_Window* window = nullptr;
+	SDL_GLContext glContext = nullptr;
 	Shader* mainShader = nullptr;
 	Shader* skyboxShader = nullptr;
 	Shader* shadowMapShader = nullptr;
@@ -35,8 +39,12 @@ private:
 	Skybox* skybox = nullptr;
 	ShadowMap* shadowMap = nullptr;
 
+	Camera camera;
+
 	entt::registry modelRegistry;
 
 	int windowWidth = 1200;
 	int windowHeight = 720;
+
+	float lastTime = 0.0f;
 };

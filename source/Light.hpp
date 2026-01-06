@@ -20,10 +20,10 @@ private:
 	friend class LightManager;
 };
 
-struct SpotLight
+struct Spotlight
 {
-	SpotLight(SpotLightComponent& component, entt::entity entity);
-	SpotLightComponent& lightData;
+	Spotlight(SpotlightComponent& component, entt::entity entity);
+	SpotlightComponent& lightData;
 
 private:
 	entt::entity lightEntity;
@@ -43,17 +43,17 @@ public:
 		const vec3& color
 	);
 
-	SpotLight createSpotLight(
+	Spotlight createSpotlight(
 		const vec3& position,
 		const vec3& direction,
 		const vec3& color
 	);
 
 	void updatePointLight(const PointLight& light);
-	void updateSpotLight(const SpotLight& light);
+	void updateSpotlight(const Spotlight& light);
 
 	void deletePointLight(const PointLight& light);
-	void deleteSpotLight(const SpotLight& light);
+	void deleteSpotlight(const Spotlight& light);
 
 	[[nodiscard]] vec3 getSunDirection() const { return sunLight.direction; }
 
@@ -61,7 +61,7 @@ public:
 	[[nodiscard]] entt::registry& getLightRegistry() { return lightRegistry; }
 
 	// Update light space matrices (call before syncing)
-	void updateSpotLightMatrices();
+	void updateSpotlightMatrices();
 
 private:
 	DirLightComponent sunLight{};
@@ -78,13 +78,13 @@ private:
 
 	void setupLightTracking();
 	void syncPointLights(entt::registry& registry, entt::entity entity);
-	void syncSpotLights(entt::registry& registry, entt::entity entity);
+	void syncSpotlights(entt::registry& registry, entt::entity entity);
 	void syncSunLight() const;
 
 	GLuint64 createPointLightShadowMap(entt::entity entity);
-	GLuint64 createSpotLightShadowMap(entt::entity entity);
+	GLuint64 createSpotlightShadowMap(entt::entity entity);
 	void destroyPointLightShadowMap(entt::entity entity);
-	void destroySpotLightShadowMap(entt::entity entity);
+	void destroySpotlightShadowMap(entt::entity entity);
 };
 
 void setupLightTracking(LightManager& lManager, entt::registry& registry, const Shader& mainShader);

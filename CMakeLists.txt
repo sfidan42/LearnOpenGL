@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(OpenGLTriangle)
+project(LearnOpenGL)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
@@ -19,7 +19,8 @@ target_include_directories(glad PUBLIC vendored/glad/include)
 
 target_include_directories(${PNAME}
         PUBLIC
-        vendored/glfw-3.4/include
+        #vendored/glfw-3.4/include
+        vendored/SDL3-3.4.0/include
         vendored/glm
         vendored/stb
         vendored/assimp/include
@@ -31,7 +32,8 @@ target_link_libraries(${PNAME}
         OpenGL::GL
         glad
         ${CMAKE_DL_LIBS}
-        ${CMAKE_SOURCE_DIR}/vendored/glfw-3.4/libglfw3.a
+        #${CMAKE_SOURCE_DIR}/vendored/glfw-3.4/libglfw3.a
+        ${CMAKE_SOURCE_DIR}/vendored/SDL3-3.4.0/libSDL3.so
         ${CMAKE_SOURCE_DIR}/vendored/assimp/libassimp.so
 )
 

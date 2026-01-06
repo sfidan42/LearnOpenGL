@@ -37,19 +37,19 @@ private:
 };
 
 // Shadow map for a single spot light (perspective 2D depth map)
-class SpotLightShadowMap
+class SpotlightShadowMap
 {
 public:
-	explicit SpotLightShadowMap(unsigned int width = 1024, unsigned int height = 1024);
-	~SpotLightShadowMap();
+	explicit SpotlightShadowMap(unsigned int width = 1024, unsigned int height = 1024);
+	~SpotlightShadowMap();
 
 	// Non-copyable
-	SpotLightShadowMap(const SpotLightShadowMap&) = delete;
-	SpotLightShadowMap& operator=(const SpotLightShadowMap&) = delete;
+	SpotlightShadowMap(const SpotlightShadowMap&) = delete;
+	SpotlightShadowMap& operator=(const SpotlightShadowMap&) = delete;
 
 	// Move semantics
-	SpotLightShadowMap(SpotLightShadowMap&& other) noexcept;
-	SpotLightShadowMap& operator=(SpotLightShadowMap&& other) noexcept;
+	SpotlightShadowMap(SpotlightShadowMap&& other) noexcept;
+	SpotlightShadowMap& operator=(SpotlightShadowMap&& other) noexcept;
 
 	void bindForWriting() const;
 	void bindForReading(GLenum textureUnit) const;

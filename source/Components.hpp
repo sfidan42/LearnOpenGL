@@ -52,7 +52,7 @@ struct PointLightComponent
 	float _pad[2]; // Padding to 16-byte alignment
 }; // Total 80 bytes
 
-struct SpotLightComponent
+struct SpotlightComponent
 {
 	vec3 position;
 	float cutOff; // Row 1
