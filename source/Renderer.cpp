@@ -1,7 +1,7 @@
 #include "Renderer.hpp"
-#include <glm/ext/quaternion_trigonometric.hpp>
+#include <glm/ext.hpp>
 #include <glm/detail/type_quat.hpp>
-#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include "Camera.hpp"
 #include <stb_image.h>
 #include <iostream>
@@ -256,7 +256,7 @@ entt::entity Renderer::loadModel(const string& modelPath, const TransformCompone
 void Renderer::renderShadowPass()
 {
 	auto& lightRegistry = lightManager->getLightRegistry();
-	if(lightRegistry.storage<DirLightShadowMap>().empty())
+	if(lightRegistry.storage<DirShadowMapComponent>().empty())
 		return;
 
 	const Shader& shader = shaders[SHADOW_MAP_SHADER];
@@ -272,10 +272,12 @@ void Renderer::renderShadowPass()
 	shader.use();
 
 	// Render shadow map for each directional light
-	auto view = lightRegistry.view<DirLightComponent, DirLightShadowMap>();
-	for(auto [entity, light, dirShadowMap] : view.each())
+	auto view = lightRegistry.view<DirLightComponent, DirShadowMapComponent>();
+	for(auto [entity, light, shadowComp] : view.each())
 	{
-		dirShadowMap.bindForWriting();
+		glViewport(0, 0, shadowComp.shadowWidth, shadowComp.shadowHeight);
+		glBindFramebuffer(GL_FRAMEBUFFER, shadowComp.frameBuffer);
+		glClear(GL_DEPTH_BUFFER_BIT);
 
 		// Use the lightSpaceMatrix from the component (updated in updateDirLightMatrices)
 		shader.setMat4("lightSpaceMatrix", light.lightSpaceMatrix);
@@ -298,7 +300,7 @@ void Renderer::renderShadowPass()
 void Renderer::renderPointLightShadows()
 {
 	auto& lightRegistry = lightManager->getLightRegistry();
-	if(lightRegistry.storage<PointLightShadowMap>().empty())
+	if(lightRegistry.storage<PointShadowMapComponent>().empty())
 		return;
 
 	const Shader& shader = shaders[SHADOW_POINT_SHADER];
@@ -312,23 +314,22 @@ void Renderer::renderPointLightShadows()
 
 	shader.use();
 
-	constexpr float farPlane = PointLightShadowMap::FAR_PLANE;
+	constexpr float farPlane = ShadowManager::POINT_LIGHT_FAR_PLANE;
 	shader.setFloat("farPlane", farPlane);
 
-	// Get point lights to access positions
-	auto view = lightRegistry.view<PointLightComponent>();
-	for(auto [entity, light] : view.each())
+	// Get point lights with shadow maps
+	auto view = lightRegistry.view<PointLightComponent, PointShadowMapComponent>();
+	for(auto [entity, light, shadowComp] : view.each())
 	{
-		auto* pShadowMap = lightRegistry.try_get<PointLightShadowMap>(entity);
-		if(!pShadowMap)
-			continue;
-		pShadowMap->bindForWriting();
+		glViewport(0, 0, shadowComp.shadowSize, shadowComp.shadowSize);
+		glBindFramebuffer(GL_FRAMEBUFFER, shadowComp.frameBuffer);
+		glClear(GL_DEPTH_BUFFER_BIT);
 
 		shader.setVec3("lightPos", light.position);
 
 		// Calculate and set the 6 shadow matrices
-		mat4 projection = PointLightShadowMap::getLightProjectionMatrix(0.1f, farPlane);
-		auto viewMatrices = PointLightShadowMap::getLightViewMatrices(light.position);
+		mat4 projection = ShadowManager::getPointLightProjection(0.1f, farPlane);
+		auto viewMatrices = ShadowManager::getPointLightViewMatrices(light.position);
 
 		for(int face = 0; face < 6; ++face)
 		{
@@ -354,7 +355,7 @@ void Renderer::renderPointLightShadows()
 void Renderer::renderSpotlightShadows()
 {
 	auto& lightRegistry = lightManager->getLightRegistry();
-	if(lightRegistry.storage<SpotlightShadowMap>().empty())
+	if(lightRegistry.storage<SpotShadowMapComponent>().empty())
 		return;
 
 	const Shader& shader = shaders[SHADOW_MAP_SHADER];
@@ -369,17 +370,15 @@ void Renderer::renderSpotlightShadows()
 
 	shader.use();
 
-	// Get Spotlights to access positions and directions
-	auto view = lightRegistry.view<SpotlightComponent>();
-	for(auto [entity, light] : view.each())
+	// Get Spotlights with shadow maps
+	auto view = lightRegistry.view<SpotlightComponent, SpotShadowMapComponent>();
+	for(auto [entity, light, shadowComp] : view.each())
 	{
-		auto* sShadowMap = lightRegistry.try_get<SpotlightShadowMap>(entity);
-		if(!sShadowMap)
-			continue;
+		glViewport(0, 0, shadowComp.shadowWidth, shadowComp.shadowHeight);
+		glBindFramebuffer(GL_FRAMEBUFFER, shadowComp.frameBuffer);
+		glClear(GL_DEPTH_BUFFER_BIT);
 
-		sShadowMap->bindForWriting();
-
-		mat4 lightSpaceMatrix = sShadowMap->getLightSpaceMatrix(
+		mat4 lightSpaceMatrix = ShadowManager::getSpotLightSpaceMatrix(
 			light.position,
 			normalize(light.direction),
 			light.outerCutOff,

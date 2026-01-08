@@ -4,6 +4,7 @@
 #include "Shader.hpp"
 #include <entt/entity/registry.hpp>
 #include "Components.hpp"
+#include "Shadow.hpp"
 
 using namespace glm;
 
@@ -31,9 +32,11 @@ public:
 
 	// Access internal registry for shadow rendering
 	[[nodiscard]] entt::registry& getLightRegistry() { return lightRegistry; }
+	[[nodiscard]] ShadowManager& getShadowManager() { return shadowManager; }
 
 private:
 	entt::registry lightRegistry;
+	ShadowManager shadowManager;
 
 	GLuint pointLightSSBO = 0;
 	GLuint spotLightSSBO = 0;
@@ -52,13 +55,6 @@ private:
 	void syncPointLights();
 	void syncSpotlights();
 	void syncDirLights();
-
-	GLuint64 createPointLightShadowMap(entt::entity lightEntity);
-	GLuint64 createSpotlightShadowMap(entt::entity lightEntity);
-	GLuint64 createDirLightShadowMap(entt::entity lightEntity);
-	void destroyPointLightShadowMap(entt::entity lightEntity);
-	void destroySpotlightShadowMap(entt::entity lightEntity);
-	void destroyDirLightShadowMap(entt::entity lightEntity);
 };
 
 void setupLightTracking(LightManager& lManager, entt::registry& registry, const Shader& mainShader);

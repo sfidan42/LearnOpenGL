@@ -137,7 +137,7 @@ static void updateScene(Renderer& renderer, const Data& gameData, const float de
 	sunAngle += 10.0f * deltaTime; // degrees per second
 	if(sunAngle >= 360.0f)
 		sunAngle -= 360.0f;
-	const vec3 sunDirection = normalize(vec3(cos(radians(sunAngle)), -1.0f, sin(radians(sunAngle))));
+	const vec3 sunDirection = normalize(vec3(cos(radians(sunAngle)), -0.7f, sin(radians(sunAngle))));
 
 	const entt::entity aux = gameData.dirLights[0];
 	DirLightComponent& dirLight = lightManager.getDirLight(aux);

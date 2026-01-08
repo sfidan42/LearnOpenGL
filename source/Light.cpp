@@ -1,10 +1,9 @@
 #include "Light.hpp"
 #include <vector>
 #include <glm/glm.hpp>
-#include "Shadow.hpp"
 
 LightManager::LightManager(const Shader& mainShader, const Shader& skyShader)
-: cachedMainShader(mainShader), cachedSkyShader(skyShader)
+: shadowManager(lightRegistry), cachedMainShader(mainShader), cachedSkyShader(skyShader)
 {
 	// Create SSBOs for dynamic lights
 	glGenBuffers(1, &pointLightSSBO);
@@ -32,14 +31,14 @@ entt::entity LightManager::createPointLight(const vec3& position, const vec3& co
 	lightComp.diffuse = color;
 	lightComp.quadratic = 0.032f;
 	lightComp.specular = color;
-	lightComp.farPlane = PointLightShadowMap::FAR_PLANE;
+	lightComp.farPlane = ShadowManager::POINT_LIGHT_FAR_PLANE;
 	lightComp.cubeMapHandle = 0; // Will be set after shadow map creation
 
 	const entt::entity lightEnt = lightRegistry.create();
 	auto& comp = lightRegistry.emplace<PointLightComponent>(lightEnt, lightComp);
 
-	// Create shadow map for this light
-	comp.cubeMapHandle = createPointLightShadowMap(lightEnt);
+	// Create shadow map for this light using ShadowManager
+	comp.cubeMapHandle = shadowManager.createPointShadowMap(lightEnt, 512);
 
 	syncPointLights();
 
@@ -65,8 +64,8 @@ entt::entity LightManager::createSpotlight(const vec3& position, const vec3& dir
 	const entt::entity lightEnt = lightRegistry.create();
 	auto& comp = lightRegistry.emplace<SpotlightComponent>(lightEnt, lightComp);
 
-	// Create shadow map for this light
-	comp.shadowMapHandle = createSpotlightShadowMap(lightEnt);
+	// Create shadow map for this light using ShadowManager
+	comp.shadowMapHandle = shadowManager.createSpotShadowMap(lightEnt, 2048, 2048);
 
 	// Calculate light space matrix AFTER shadow map is created
 	recalcSpotlightMatrix(lightEnt);
@@ -87,7 +86,8 @@ entt::entity LightManager::createDirLight(const vec3& direction, const vec3& col
 	const entt::entity lightEnt = lightRegistry.create();
 	auto& comp = lightRegistry.emplace<DirLightComponent>(lightEnt, lightComp);
 
-	comp.shadowMapHandle = createDirLightShadowMap(lightEnt);
+	// Create shadow map for this light using ShadowManager
+	comp.shadowMapHandle = shadowManager.createDirShadowMap(lightEnt, 4096, 4096);
 
 	// Calculate light space matrix AFTER shadow map is created
 	recalcDirLightMatrix(lightEnt);
@@ -133,33 +133,32 @@ void LightManager::updateDirLight(const entt::entity lightEntity)
 
 void LightManager::deletePointLight(const entt::entity lightEntity)
 {
-	destroyPointLightShadowMap(lightEntity);
+	shadowManager.destroyPointShadowMap(lightEntity);
 	lightRegistry.destroy(lightEntity);
 	syncPointLights();
 }
 
 void LightManager::deleteSpotlight(const entt::entity lightEntity)
 {
-	destroySpotlightShadowMap(lightEntity);
+	shadowManager.destroySpotShadowMap(lightEntity);
 	lightRegistry.destroy(lightEntity);
 	syncSpotlights();
 }
 
 void LightManager::deleteDirLight(const entt::entity lightEntity)
 {
-	destroyDirLightShadowMap(lightEntity);
+	shadowManager.destroyDirShadowMap(lightEntity);
 	lightRegistry.destroy(lightEntity);
 	syncDirLights();
 }
 
 void LightManager::recalcSpotlightMatrix(const entt::entity lightEntity)
 {
-	const auto& [sLight, shadow]
-		= lightRegistry.try_get<SpotlightComponent, SpotlightShadowMap>(lightEntity);
-	if(!sLight || !shadow)
+	auto* sLight = lightRegistry.try_get<SpotlightComponent>(lightEntity);
+	if(!sLight)
 		return;
 
-	sLight->lightSpaceMatrix = shadow->getLightSpaceMatrix(
+	sLight->lightSpaceMatrix = ShadowManager::getSpotLightSpaceMatrix(
 		sLight->position, normalize(sLight->direction),
 		sLight->outerCutOff, 0.1f, 50.0f
 	);
@@ -167,13 +166,14 @@ void LightManager::recalcSpotlightMatrix(const entt::entity lightEntity)
 
 void LightManager::recalcDirLightMatrix(const entt::entity lightEntity)
 {
-	const auto& [dirLight, shadow] = lightRegistry.try_get<DirLightComponent, DirLightShadowMap>(lightEntity);
-	if(!dirLight || !shadow)
+	auto* dirLight = lightRegistry.try_get<DirLightComponent>(lightEntity);
+	if(!dirLight)
 		return;
-	dirLight->lightSpaceMatrix = shadow->getLightSpaceMatrix(
+
+	dirLight->lightSpaceMatrix = ShadowManager::getDirLightSpaceMatrix(
 		dirLight->direction,
 		50.0f, // ortho size - covers -50 to +50 on X/Y in light space
-		0.1f, // near plane
+		0.1f,  // near plane
 		150.0f // far plane
 	);
 }
@@ -290,52 +290,4 @@ void LightManager::syncDirLights()
 
 	cachedSkyShader.use();
 	cachedSkyShader.setInt("u_numDirLights", dLightsCount);
-}
-
-GLuint64 LightManager::createPointLightShadowMap(const entt::entity lightEntity)
-{
-	const auto& shadowMap = lightRegistry.emplace<PointLightShadowMap>(lightEntity, 512);
-	const GLuint64 handle = glGetTextureHandleARB(shadowMap.getDepthCubemap());
-	glMakeTextureHandleResidentARB(handle);
-	return handle;
-}
-
-GLuint64 LightManager::createSpotlightShadowMap(const entt::entity lightEntity)
-{
-	const auto& shadowMap = lightRegistry.emplace<SpotlightShadowMap>(lightEntity, 2048, 2048);
-	const GLuint64 handle = glGetTextureHandleARB(shadowMap.getDepthTexture());
-	glMakeTextureHandleResidentARB(handle);
-	return handle;
-}
-
-GLuint64 LightManager::createDirLightShadowMap(const entt::entity lightEntity)
-{
-	const auto& shadowMap = lightRegistry.emplace<DirLightShadowMap>(lightEntity, 2048, 2048);
-	const GLuint64 handle = glGetTextureHandleARB(shadowMap.getDepthTexture());
-	glMakeTextureHandleResidentARB(handle);
-	return handle;
-}
-
-void LightManager::destroyPointLightShadowMap(const entt::entity lightEntity)
-{
-	GLuint64& handle = lightRegistry.get<PointLightComponent>(lightEntity).cubeMapHandle;
-	handle = 0;
-	glMakeTextureHandleResidentARB(handle);
-	lightRegistry.remove<PointLightShadowMap>(lightEntity);
-}
-
-void LightManager::destroySpotlightShadowMap(entt::entity lightEntity)
-{
-	GLuint64& handle = lightRegistry.get<SpotlightComponent>(lightEntity).shadowMapHandle;
-	handle = 0;
-	glMakeTextureHandleResidentARB(handle);
-	lightRegistry.remove<SpotlightShadowMap>(lightEntity);
-}
-
-void LightManager::destroyDirLightShadowMap(const entt::entity lightEntity)
-{
-	GLuint64& handle = lightRegistry.get<DirLightComponent>(lightEntity).shadowMapHandle;
-	handle = 0;
-	glMakeTextureHandleResidentARB(handle);
-	lightRegistry.remove<DirLightShadowMap>(lightEntity);
 }
