@@ -1,5 +1,4 @@
 #pragma once
-#include <vector>
 #include <string>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
@@ -10,7 +9,7 @@ using namespace glm;
 class Shader
 {
 public:
-	Shader() = default;
+	explicit Shader(const string& filepath);
 	~Shader();
 
 	// non-copyable, because of OpenGL resource management
@@ -18,7 +17,11 @@ public:
 	Shader(const Shader&) = delete;
 	Shader& operator=(const Shader&) = delete;
 
-	bool load(const string& filepath);
+	// movable for use in containers like std::vector
+	Shader(Shader&& other) noexcept;
+	Shader& operator=(Shader&& other) noexcept;
+
+	bool ok() const;
 	void use() const;
 
 	void setMat4(const string& name, const mat4& matrix) const;
@@ -26,8 +29,6 @@ public:
 	void setFloat(const string& name, float value) const;
 	void setInt(const string& name, int value) const;
 	void setBool(const string& name, int value) const;
-
-	GLuint program = -1;
 
 private:
 	struct ShaderSource
@@ -37,8 +38,10 @@ private:
 		string fragment;
 	};
 
-	ShaderSource read(const string& filepath);
+	bool load(const string& filepath);
+	static ShaderSource read(const string& filepath);
 	static GLuint create(const ShaderSource& shaderCode);
 
 	ShaderSource source;
+	GLuint program = 0;
 };

@@ -6,15 +6,14 @@
 #include <stb_image.h>
 #include <iostream>
 
+#include "Shadow.hpp"
+
 Renderer::~Renderer()
 {
 	// destroy these first, because they use OpenGL context
 	modelRegistry.clear();
+	shaders.clear();
 	delete lightManager;
-	delete mainShader;
-	delete skyboxShader;
-	delete shadowMapShader;
-	delete shadowPointShader;
 	delete skybox;
 	if(glContext)
 		SDL_GL_DestroyContext(glContext);
@@ -76,40 +75,18 @@ bool Renderer::init(SDL_Window* sdlWindow)
 	// My redundant MSAA enable call
 	glEnable(GL_MULTISAMPLE);
 
-	const string mainShaderPath = "shaders/main.glsl";
-	const string skyboxShaderPath = "shaders/skybox.glsl";
-
-	mainShader = new Shader();
-	if(!mainShader->load(mainShaderPath))
+	for(int type = 0; type < NUM_SHADERS; ++type)
 	{
-		cout << "Failed to load shaders" << endl;
-		return false;
+		cout << "Loading shader: " << shaderFiles[type] << endl;
+		shaders.emplace_back(shaderFiles[type]);
+		if(!shaders[type].ok())
+		{
+			cout << "Failed to load shader: " << shaderFiles[type] << endl;
+			return false;
+		}
 	}
 
-	skyboxShader = new Shader();
-	if(!skyboxShader->load(skyboxShaderPath))
-	{
-		cout << "Failed to load skybox shaders" << endl;
-		return false;
-	}
-
-	// Load shadow map shader
-	shadowMapShader = new Shader();
-	if(!shadowMapShader->load("shaders/shadow_map.glsl"))
-	{
-		cout << "Failed to load shadow shaders" << endl;
-		return false;
-	}
-
-	// Load point light shadow shader (with geometry shader for cube map)
-	shadowPointShader = new Shader();
-	if(!shadowPointShader->load("shaders/shadow_point.glsl"))
-	{
-		cout << "Failed to load point light shadow shaders" << endl;
-		return false;
-	}
-
-	skybox = new Skybox();
+	skybox = new Skybox(shaders[SKYBOX_SHADER]);
 
 	const string faces[6] = {
 		"right.jpg",
@@ -128,7 +105,7 @@ bool Renderer::init(SDL_Window* sdlWindow)
 
 	setupInstanceTracking(modelRegistry);
 
-	lightManager = new LightManager(*mainShader, *skyboxShader);
+	lightManager = new LightManager(shaders[MAIN_SHADER], shaders[SKYBOX_SHADER]);
 
 	return true;
 }
@@ -282,6 +259,8 @@ void Renderer::renderShadowPass()
 	if(lightRegistry.storage<DirLightShadowMap>().empty())
 		return;
 
+	const Shader& shader = shaders[SHADOW_MAP_SHADER];
+
 	// Use back-face culling so front faces are rendered to shadow map
 	// This properly shadows objects below surfaces (floors, roofs, etc.)
 	glCullFace(GL_BACK);
@@ -290,7 +269,7 @@ void Renderer::renderShadowPass()
 	glEnable(GL_POLYGON_OFFSET_FILL);
 	glPolygonOffset(2.0f, 4.0f);
 
-	shadowMapShader->use();
+	shader.use();
 
 	// Render shadow map for each directional light
 	auto view = lightRegistry.view<DirLightComponent, DirLightShadowMap>();
@@ -299,13 +278,13 @@ void Renderer::renderShadowPass()
 		dirShadowMap.bindForWriting();
 
 		// Use the lightSpaceMatrix from the component (updated in updateDirLightMatrices)
-		shadowMapShader->setMat4("lightSpaceMatrix", light.lightSpaceMatrix);
+		shader.setMat4("lightSpaceMatrix", light.lightSpaceMatrix);
 
 		// Render all models to shadow map
 		const auto modelView = modelRegistry.view<ModelComponent>();
 		modelView.each([&](const ModelComponent& modelComp)
 		{
-			modelComp.drawInstanced(*shadowMapShader);
+			modelComp.drawInstanced(shader);
 		});
 	}
 
@@ -322,6 +301,8 @@ void Renderer::renderPointLightShadows()
 	if(lightRegistry.storage<PointLightShadowMap>().empty())
 		return;
 
+	const Shader& shader = shaders[SHADOW_POINT_SHADER];
+
 	// Use back-face culling so front faces are rendered to shadow map
 	glCullFace(GL_BACK);
 
@@ -329,10 +310,10 @@ void Renderer::renderPointLightShadows()
 	glEnable(GL_POLYGON_OFFSET_FILL);
 	glPolygonOffset(2.0f, 4.0f);
 
-	shadowPointShader->use();
+	shader.use();
 
 	constexpr float farPlane = PointLightShadowMap::FAR_PLANE;
-	shadowPointShader->setFloat("farPlane", farPlane);
+	shader.setFloat("farPlane", farPlane);
 
 	// Get point lights to access positions
 	auto view = lightRegistry.view<PointLightComponent>();
@@ -343,7 +324,7 @@ void Renderer::renderPointLightShadows()
 			continue;
 		pShadowMap->bindForWriting();
 
-		shadowPointShader->setVec3("lightPos", light.position);
+		shader.setVec3("lightPos", light.position);
 
 		// Calculate and set the 6 shadow matrices
 		mat4 projection = PointLightShadowMap::getLightProjectionMatrix(0.1f, farPlane);
@@ -353,14 +334,14 @@ void Renderer::renderPointLightShadows()
 		{
 			mat4 lightShadowMatrix = projection * viewMatrices[face];
 			string uniformName = "shadowMatrices[" + std::to_string(face) + "]";
-			shadowPointShader->setMat4(uniformName, lightShadowMatrix);
+			shader.setMat4(uniformName, lightShadowMatrix);
 		}
 
 		// Render all models
 		const auto modelView = modelRegistry.view<ModelComponent>();
-		modelView.each([this](const ModelComponent& modelComp)
+		modelView.each([&shader](const ModelComponent& modelComp)
 		{
-			modelComp.drawInstanced(*shadowPointShader);
+			modelComp.drawInstanced(shader);
 		});
 	}
 
@@ -376,6 +357,8 @@ void Renderer::renderSpotlightShadows()
 	if(lightRegistry.storage<SpotlightShadowMap>().empty())
 		return;
 
+	const Shader& shader = shaders[SHADOW_MAP_SHADER];
+
 	// Use back-face culling so front faces are rendered to shadow map
 	glCullFace(GL_BACK);
 
@@ -384,7 +367,7 @@ void Renderer::renderSpotlightShadows()
 	glEnable(GL_POLYGON_OFFSET_FILL);
 	glPolygonOffset(4.0f, 8.0f);
 
-	shadowMapShader->use();
+	shader.use();
 
 	// Get Spotlights to access positions and directions
 	auto view = lightRegistry.view<SpotlightComponent>();
@@ -402,13 +385,13 @@ void Renderer::renderSpotlightShadows()
 			light.outerCutOff,
 			0.1f, 50.0f
 		);
-		shadowMapShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
+		shader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
 
 		// Render all models
 		const auto modelView = modelRegistry.view<ModelComponent>();
-		modelView.each([this](const ModelComponent& modelComp)
+		modelView.each([&shader](const ModelComponent& modelComp)
 		{
-			modelComp.drawInstanced(*shadowMapShader);
+			modelComp.drawInstanced(shader);
 		});
 	}
 
@@ -425,9 +408,12 @@ void Renderer::renderScene()
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	camera.send(*mainShader, *skyboxShader);
+	const Shader& mainShader = shaders[MAIN_SHADER];
+	const Shader& skyboxShader = shaders[SKYBOX_SHADER];
 
-	mainShader->use();
+	camera.send(mainShader, skyboxShader);
+
+	mainShader.use();
 
 	// All shadow maps (directional, point, and spotlight) are now handled via bindless textures
 	// stored directly in the light SSBOs - no need to bind them here
@@ -435,8 +421,8 @@ void Renderer::renderScene()
 	const auto modelView = modelRegistry.view<ModelComponent>();
 	modelView.each([&](const ModelComponent& modelComp)
 	{
-		modelComp.drawInstanced(*mainShader);
+		modelComp.drawInstanced(mainShader);
 	});
 
-	skybox->draw(*skyboxShader);
+	skybox->draw();
 }

@@ -1,7 +1,7 @@
 #include "Light.hpp"
-
 #include <vector>
 #include <glm/glm.hpp>
+#include "Shadow.hpp"
 
 LightManager::LightManager(const Shader& mainShader, const Shader& skyShader)
 : cachedMainShader(mainShader), cachedSkyShader(skyShader)
@@ -40,6 +40,8 @@ entt::entity LightManager::createPointLight(const vec3& position, const vec3& co
 
 	// Create shadow map for this light
 	comp.cubeMapHandle = createPointLightShadowMap(lightEnt);
+
+	syncPointLights();
 
 	return lightEnt;
 }
@@ -94,39 +96,39 @@ entt::entity LightManager::createDirLight(const vec3& direction, const vec3& col
 	return lightEnt;
 }
 
-PointLightComponent& LightManager::getPointLight(const entt::entity entity)
+PointLightComponent& LightManager::getPointLight(const entt::entity lightEntity)
 {
-	assert(lightRegistry.all_of<PointLightComponent>(entity) && "Entity does not have PointLightComponent");
-	return lightRegistry.get<PointLightComponent>(entity);
+	assert(lightRegistry.all_of<PointLightComponent>(lightEntity) && "Entity does not have PointLightComponent");
+	return lightRegistry.get<PointLightComponent>(lightEntity);
 }
 
-SpotlightComponent& LightManager::getSpotlight(const entt::entity entity)
+SpotlightComponent& LightManager::getSpotlight(const entt::entity lightEntity)
 {
-	assert(lightRegistry.all_of<SpotlightComponent>(entity) && "Entity does not have SpotlightComponent");
-	return lightRegistry.get<SpotlightComponent>(entity);
+	assert(lightRegistry.all_of<SpotlightComponent>(lightEntity) && "Entity does not have SpotlightComponent");
+	return lightRegistry.get<SpotlightComponent>(lightEntity);
 }
 
-DirLightComponent& LightManager::getDirLight(const entt::entity entity)
+DirLightComponent& LightManager::getDirLight(const entt::entity lightEntity)
 {
-	assert(lightRegistry.all_of<DirLightComponent>(entity) && "Entity does not have DirLightComponent");
-	return lightRegistry.get<DirLightComponent>(entity);
+	assert(lightRegistry.all_of<DirLightComponent>(lightEntity) && "Entity does not have DirLightComponent");
+	return lightRegistry.get<DirLightComponent>(lightEntity);
 }
 
-void LightManager::updatePointLight(const entt::entity /*lightEntity*/)
+void LightManager::updatePointLight(const entt::entity lightEntity)
 {
-	syncPointLights();
+	syncPointLight(lightEntity);
 }
 
 void LightManager::updateSpotlight(const entt::entity lightEntity)
 {
 	recalcSpotlightMatrix(lightEntity);
-	syncSpotlights();
+	syncSpotlight(lightEntity);
 }
 
 void LightManager::updateDirLight(const entt::entity lightEntity)
 {
 	recalcDirLightMatrix(lightEntity);
-	syncDirLights();
+	syncDirLight(lightEntity);
 }
 
 void LightManager::deletePointLight(const entt::entity lightEntity)
@@ -150,10 +152,10 @@ void LightManager::deleteDirLight(const entt::entity lightEntity)
 	syncDirLights();
 }
 
-void LightManager::recalcSpotlightMatrix(const entt::entity entity)
+void LightManager::recalcSpotlightMatrix(const entt::entity lightEntity)
 {
 	const auto& [sLight, shadow]
-		= lightRegistry.try_get<SpotlightComponent, SpotlightShadowMap>(entity);
+		= lightRegistry.try_get<SpotlightComponent, SpotlightShadowMap>(lightEntity);
 	if(!sLight || !shadow)
 		return;
 
@@ -163,9 +165,9 @@ void LightManager::recalcSpotlightMatrix(const entt::entity entity)
 	);
 }
 
-void LightManager::recalcDirLightMatrix(const entt::entity entity)
+void LightManager::recalcDirLightMatrix(const entt::entity lightEntity)
 {
-	const auto& [dirLight, shadow] = lightRegistry.try_get<DirLightComponent, DirLightShadowMap>(entity);
+	const auto& [dirLight, shadow] = lightRegistry.try_get<DirLightComponent, DirLightShadowMap>(lightEntity);
 	if(!dirLight || !shadow)
 		return;
 	dirLight->lightSpaceMatrix = shadow->getLightSpaceMatrix(
@@ -174,6 +176,48 @@ void LightManager::recalcDirLightMatrix(const entt::entity entity)
 		0.1f, // near plane
 		150.0f // far plane
 	);
+}
+
+void LightManager::syncPointLight(const entt::entity lightEntity)
+{
+	const PointLightComponent& pointLight = getPointLight(lightEntity);
+	const GLuint index = static_cast<GLuint>(lightRegistry.view<PointLightComponent>()->index(lightEntity));
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, pointLightSSBO);
+	glBufferSubData(
+		GL_SHADER_STORAGE_BUFFER,
+		index * sizeof(PointLightComponent),
+		sizeof(PointLightComponent),
+		&pointLight
+	);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+void LightManager::syncSpotlight(const entt::entity lightEntity)
+{
+	const SpotlightComponent& spotLight = getSpotlight(lightEntity);
+	const GLuint index = static_cast<GLuint>(lightRegistry.view<SpotlightComponent>()->index(lightEntity));
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, spotLightSSBO);
+	glBufferSubData(
+		GL_SHADER_STORAGE_BUFFER,
+		index * sizeof(SpotlightComponent),
+		sizeof(SpotlightComponent),
+		&spotLight
+	);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+void LightManager::syncDirLight(const entt::entity lightEntity)
+{
+	const DirLightComponent& dirLight = getDirLight(lightEntity);
+	const GLuint index = static_cast<GLuint>(lightRegistry.view<DirLightComponent>()->index(lightEntity));
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sunLightSSBO);
+	glBufferSubData(
+		GL_SHADER_STORAGE_BUFFER,
+		index * sizeof(DirLightComponent),
+		sizeof(DirLightComponent),
+		&dirLight
+	);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 void LightManager::syncPointLights()
@@ -248,50 +292,50 @@ void LightManager::syncDirLights()
 	cachedSkyShader.setInt("u_numDirLights", dLightsCount);
 }
 
-GLuint64 LightManager::createPointLightShadowMap(const entt::entity entity)
+GLuint64 LightManager::createPointLightShadowMap(const entt::entity lightEntity)
 {
-	const auto& shadowMap = lightRegistry.emplace<PointLightShadowMap>(entity, 512);
+	const auto& shadowMap = lightRegistry.emplace<PointLightShadowMap>(lightEntity, 512);
 	const GLuint64 handle = glGetTextureHandleARB(shadowMap.getDepthCubemap());
 	glMakeTextureHandleResidentARB(handle);
 	return handle;
 }
 
-GLuint64 LightManager::createSpotlightShadowMap(const entt::entity entity)
+GLuint64 LightManager::createSpotlightShadowMap(const entt::entity lightEntity)
 {
-	const auto& shadowMap = lightRegistry.emplace<SpotlightShadowMap>(entity, 2048, 2048);
+	const auto& shadowMap = lightRegistry.emplace<SpotlightShadowMap>(lightEntity, 2048, 2048);
 	const GLuint64 handle = glGetTextureHandleARB(shadowMap.getDepthTexture());
 	glMakeTextureHandleResidentARB(handle);
 	return handle;
 }
 
-GLuint64 LightManager::createDirLightShadowMap(const entt::entity entity)
+GLuint64 LightManager::createDirLightShadowMap(const entt::entity lightEntity)
 {
-	const auto& shadowMap = lightRegistry.emplace<DirLightShadowMap>(entity, 2048, 2048);
+	const auto& shadowMap = lightRegistry.emplace<DirLightShadowMap>(lightEntity, 2048, 2048);
 	const GLuint64 handle = glGetTextureHandleARB(shadowMap.getDepthTexture());
 	glMakeTextureHandleResidentARB(handle);
 	return handle;
 }
 
-void LightManager::destroyPointLightShadowMap(const entt::entity entity)
+void LightManager::destroyPointLightShadowMap(const entt::entity lightEntity)
 {
-	GLuint64& handle = lightRegistry.get<PointLightComponent>(entity).cubeMapHandle;
+	GLuint64& handle = lightRegistry.get<PointLightComponent>(lightEntity).cubeMapHandle;
 	handle = 0;
 	glMakeTextureHandleResidentARB(handle);
-	lightRegistry.remove<PointLightShadowMap>(entity);
+	lightRegistry.remove<PointLightShadowMap>(lightEntity);
 }
 
-void LightManager::destroySpotlightShadowMap(entt::entity entity)
+void LightManager::destroySpotlightShadowMap(entt::entity lightEntity)
 {
-	GLuint64& handle = lightRegistry.get<SpotlightComponent>(entity).shadowMapHandle;
+	GLuint64& handle = lightRegistry.get<SpotlightComponent>(lightEntity).shadowMapHandle;
 	handle = 0;
 	glMakeTextureHandleResidentARB(handle);
-	lightRegistry.remove<SpotlightShadowMap>(entity);
+	lightRegistry.remove<SpotlightShadowMap>(lightEntity);
 }
 
-void LightManager::destroyDirLightShadowMap(const entt::entity entity)
+void LightManager::destroyDirLightShadowMap(const entt::entity lightEntity)
 {
-	GLuint64& handle = lightRegistry.get<DirLightComponent>(entity).shadowMapHandle;
+	GLuint64& handle = lightRegistry.get<DirLightComponent>(lightEntity).shadowMapHandle;
 	handle = 0;
 	glMakeTextureHandleResidentARB(handle);
-	lightRegistry.remove<DirLightShadowMap>(entity);
+	lightRegistry.remove<DirLightShadowMap>(lightEntity);
 }

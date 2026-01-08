@@ -3,7 +3,7 @@
 #include <iostream>
 #include "error_macro.hpp"
 
-GLuint CubemapFromFile(const string& directory, const string textureFacePaths[6])
+GLuint CubeMapFromFile(const string& directory, const string textureFacePaths[6])
 {
 	GLuint textureID;
 	GL_CHECK(glGenTextures(1, &textureID));
@@ -29,7 +29,7 @@ GLuint CubemapFromFile(const string& directory, const string textureFacePaths[6]
 		}
 		else
 		{
-			std::cout << "Cubemap texture failed to load at path: " << path << std::endl;
+			std::cout << "Cube map texture failed to load at path: " << path << std::endl;
 			stbi_image_free(data);
 		}
 	}
@@ -42,7 +42,8 @@ GLuint CubemapFromFile(const string& directory, const string textureFacePaths[6]
 	return textureID;
 }
 
-Skybox::Skybox()
+Skybox::Skybox(const Shader& skyboxShader)
+: cachedSkyboxShader(skyboxShader)
 {
 	skyboxVertices = {
 		// positions
@@ -112,7 +113,7 @@ void Skybox::loadFaces(const string& directory, const string facePaths[6])
 {
 	if (skyboxTextureID)
 		glDeleteTextures(1, &skyboxTextureID);
-	skyboxTextureID = CubemapFromFile(directory, facePaths);
+	skyboxTextureID = CubeMapFromFile(directory, facePaths);
 }
 
 void Skybox::scale(const float scale)
@@ -120,12 +121,12 @@ void Skybox::scale(const float scale)
 	scaleFactor = scale;
 }
 
-void Skybox::draw(const Shader& shader) const
+void Skybox::draw() const
 {
 	glDepthFunc(GL_LEQUAL);
-	shader.use();
-	shader.setInt("cubemap", 0);
-	shader.setFloat("scaleFactor", scaleFactor);
+	cachedSkyboxShader.use();
+	cachedSkyboxShader.setInt("cubemap", 0);
+	cachedSkyboxShader.setFloat("scaleFactor", scaleFactor);
 	GL_CHECK(glBindVertexArray(skyboxVAO));
 	GL_CHECK(glActiveTexture(GL_TEXTURE0));
 	GL_CHECK(glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTextureID));

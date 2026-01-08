@@ -71,9 +71,39 @@ static bool compile(GLuint shader, const char* shader_source)
 	return true;
 }
 
+Shader::Shader(const string& filepath)
+{
+	load(filepath);
+}
+
 Shader::~Shader()
 {
-	glDeleteProgram(program);
+	if(program != 0)
+		glDeleteProgram(program);
+}
+
+Shader::Shader(Shader&& other) noexcept
+	: source(std::move(other.source)), program(other.program)
+{
+	other.program = 0; // prevent double deletion
+}
+
+Shader& Shader::operator=(Shader&& other) noexcept
+{
+	if(this != &other)
+	{
+		if(program)
+			glDeleteProgram(program);
+		source = std::move(other.source);
+		program = other.program;
+		other.program = 0;
+	}
+	return *this;
+}
+
+bool Shader::ok() const
+{
+	return glIsProgram(program);
 }
 
 void Shader::use() const

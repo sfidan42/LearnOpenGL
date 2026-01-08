@@ -28,20 +28,34 @@ private:
 
 	SDL_Window* window = nullptr;
 	SDL_GLContext glContext = nullptr;
-	Shader* mainShader = nullptr;
-	Shader* skyboxShader = nullptr;
-	Shader* shadowMapShader = nullptr;
-	Shader* shadowPointShader = nullptr;
-	Skybox* skybox = nullptr;
-	LightManager* lightManager = nullptr;
-
-	Camera camera;
-
-	entt::registry modelRegistry;
-
 	int windowWidth = 1200;
 	int windowHeight = 720;
 
-	float lastTime = 0.0f;
+	enum shaderType
+	{
+		MAIN_SHADER,
+		SKYBOX_SHADER,
+		SHADOW_MAP_SHADER,
+		SHADOW_POINT_SHADER,
+		NUM_SHADERS,
+	};
+
+	string shaderFiles[NUM_SHADERS] = {
+		"shaders/main.glsl",
+		"shaders/skybox.glsl",
+		"shaders/shadow_map.glsl",
+		"shaders/shadow_point.glsl",
+	};
+
+	vector<Shader> shaders;
+
+	Camera camera;
+
+	Skybox* skybox = nullptr;
+
+	LightManager* lightManager = nullptr;
+
+	entt::registry modelRegistry;
+
 	bool isFocused = false;
 };
