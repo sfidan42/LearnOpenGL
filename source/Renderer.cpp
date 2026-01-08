@@ -1,12 +1,9 @@
 #include "Renderer.hpp"
 #include <glm/ext.hpp>
 #include <glm/detail/type_quat.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include "Camera.hpp"
 #include <stb_image.h>
 #include <iostream>
-
-#include "Shadow.hpp"
 
 Renderer::~Renderer()
 {
@@ -105,7 +102,7 @@ bool Renderer::init(SDL_Window* sdlWindow)
 
 	setupInstanceTracking(modelRegistry);
 
-	lightManager = new LightManager(shaders[MAIN_SHADER], shaders[SKYBOX_SHADER]);
+	lightManager = new LightManager(shaders[MAIN_SHADER], shaders[SKYBOX_SHADER], shaders[SHADOW_MAP_SHADER]);
 
 	return true;
 }
@@ -195,17 +192,27 @@ void Renderer::event(const SDL_Event& event)
 	}
 }
 
-void Renderer::render(const float deltaTime)
+void Renderer::update(const float deltaTime)
 {
 	camera.update(deltaTime);
 
+	auto drawModels = [this](const Shader& shader)
+	{
+		const auto modelView = modelRegistry.view<ModelComponent>();
+		modelView.each([&shader](const ModelComponent& modelComp)
+		{
+			modelComp.drawInstanced(shader);
+		});
+	};
+
 	// ========== PASS 1: Shadow Maps ==========
-	renderShadowPass(); // Directional light (2D)
-	renderPointLightShadows(); // Point lights (cube maps)
-	renderSpotlightShadows(); // Spotlights (2D)
+
+	lightManager->renderDirLightShadows(drawModels);
+	lightManager->renderPointLightShadows(drawModels);
+	lightManager->renderSpotlightShadows(drawModels);
 
 	// ========== PASS 2: Main Scene ==========
-	renderScene();
+	renderScene(drawModels);
 
 	SDL_GL_SwapWindow(window);
 }
@@ -253,154 +260,7 @@ entt::entity Renderer::loadModel(const string& modelPath, const TransformCompone
 	return instance;
 }
 
-void Renderer::renderShadowPass()
-{
-	auto& lightRegistry = lightManager->getLightRegistry();
-	if(lightRegistry.storage<DirShadowMapComponent>().empty())
-		return;
-
-	const Shader& shader = shaders[SHADOW_MAP_SHADER];
-
-	// Use back-face culling so front faces are rendered to shadow map
-	// This properly shadows objects below surfaces (floors, roofs, etc.)
-	glCullFace(GL_BACK);
-
-	// Enable polygon offset to reduce shadow acne and light leakage
-	glEnable(GL_POLYGON_OFFSET_FILL);
-	glPolygonOffset(2.0f, 4.0f);
-
-	shader.use();
-
-	// Render shadow map for each directional light
-	auto view = lightRegistry.view<DirLightComponent, DirShadowMapComponent>();
-	for(auto [entity, light, shadowComp] : view.each())
-	{
-		glViewport(0, 0, shadowComp.shadowWidth, shadowComp.shadowHeight);
-		glBindFramebuffer(GL_FRAMEBUFFER, shadowComp.frameBuffer);
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		// Use the lightSpaceMatrix from the component (updated in updateDirLightMatrices)
-		shader.setMat4("lightSpaceMatrix", light.lightSpaceMatrix);
-
-		// Render all models to shadow map
-		const auto modelView = modelRegistry.view<ModelComponent>();
-		modelView.each([&](const ModelComponent& modelComp)
-		{
-			modelComp.drawInstanced(shader);
-		});
-	}
-
-	// Disable polygon offset
-	glDisable(GL_POLYGON_OFFSET_FILL);
-
-	// Unbind shadow framebuffer
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-void Renderer::renderPointLightShadows()
-{
-	auto& lightRegistry = lightManager->getLightRegistry();
-	if(lightRegistry.storage<PointShadowMapComponent>().empty())
-		return;
-
-	const Shader& shader = shaders[SHADOW_POINT_SHADER];
-
-	// Use back-face culling so front faces are rendered to shadow map
-	glCullFace(GL_BACK);
-
-	// Enable polygon offset to reduce light leakage
-	glEnable(GL_POLYGON_OFFSET_FILL);
-	glPolygonOffset(2.0f, 4.0f);
-
-	shader.use();
-
-	constexpr float farPlane = ShadowManager::POINT_LIGHT_FAR_PLANE;
-	shader.setFloat("farPlane", farPlane);
-
-	// Get point lights with shadow maps
-	auto view = lightRegistry.view<PointLightComponent, PointShadowMapComponent>();
-	for(auto [entity, light, shadowComp] : view.each())
-	{
-		glViewport(0, 0, shadowComp.shadowSize, shadowComp.shadowSize);
-		glBindFramebuffer(GL_FRAMEBUFFER, shadowComp.frameBuffer);
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		shader.setVec3("lightPos", light.position);
-
-		// Calculate and set the 6 shadow matrices
-		mat4 projection = ShadowManager::getPointLightProjection(0.1f, farPlane);
-		auto viewMatrices = ShadowManager::getPointLightViewMatrices(light.position);
-
-		for(int face = 0; face < 6; ++face)
-		{
-			mat4 lightShadowMatrix = projection * viewMatrices[face];
-			string uniformName = "shadowMatrices[" + std::to_string(face) + "]";
-			shader.setMat4(uniformName, lightShadowMatrix);
-		}
-
-		// Render all models
-		const auto modelView = modelRegistry.view<ModelComponent>();
-		modelView.each([&shader](const ModelComponent& modelComp)
-		{
-			modelComp.drawInstanced(shader);
-		});
-	}
-
-	// Disable polygon offset
-	glDisable(GL_POLYGON_OFFSET_FILL);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-void Renderer::renderSpotlightShadows()
-{
-	auto& lightRegistry = lightManager->getLightRegistry();
-	if(lightRegistry.storage<SpotShadowMapComponent>().empty())
-		return;
-
-	const Shader& shader = shaders[SHADOW_MAP_SHADER];
-
-	// Use back-face culling so front faces are rendered to shadow map
-	glCullFace(GL_BACK);
-
-	// Enable polygon offset to reduce light leakage
-	// Higher values needed for spotlights to prevent leakage through thin geometry
-	glEnable(GL_POLYGON_OFFSET_FILL);
-	glPolygonOffset(4.0f, 8.0f);
-
-	shader.use();
-
-	// Get Spotlights with shadow maps
-	auto view = lightRegistry.view<SpotlightComponent, SpotShadowMapComponent>();
-	for(auto [entity, light, shadowComp] : view.each())
-	{
-		glViewport(0, 0, shadowComp.shadowWidth, shadowComp.shadowHeight);
-		glBindFramebuffer(GL_FRAMEBUFFER, shadowComp.frameBuffer);
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		mat4 lightSpaceMatrix = ShadowManager::getSpotLightSpaceMatrix(
-			light.position,
-			normalize(light.direction),
-			light.outerCutOff,
-			0.1f, 50.0f
-		);
-		shader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-
-		// Render all models
-		const auto modelView = modelRegistry.view<ModelComponent>();
-		modelView.each([&shader](const ModelComponent& modelComp)
-		{
-			modelComp.drawInstanced(shader);
-		});
-	}
-
-	// Disable polygon offset
-	glDisable(GL_POLYGON_OFFSET_FILL);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-void Renderer::renderScene()
+void Renderer::renderScene(const DrawModelsCallback& drawModels) const
 {
 	// Restore viewport to window size
 	glViewport(0, 0, windowWidth, windowHeight);
@@ -417,11 +277,8 @@ void Renderer::renderScene()
 	// All shadow maps (directional, point, and spotlight) are now handled via bindless textures
 	// stored directly in the light SSBOs - no need to bind them here
 
-	const auto modelView = modelRegistry.view<ModelComponent>();
-	modelView.each([&](const ModelComponent& modelComp)
-	{
-		modelComp.drawInstanced(mainShader);
-	});
+	// Draw all models
+	drawModels(mainShader);
 
 	skybox->draw();
 }

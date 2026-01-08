@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <array>
 #include <glm/glm.hpp>
 #include "Model.hpp"
 
@@ -50,9 +51,10 @@ struct PointLightComponent
 	float quadratic; // Row 3: 16 bytes
 	vec3 specular;
 	float farPlane; // Row 4: 16 bytes - far plane for shadow calculation
+	std::array<mat4, 6> shadowMatrices; // Cached projection * view matrices for 6 faces
 	uint64_t cubeMapHandle; // Bindless cube map handle (8 bytes)
-	float _pad[2] = { 0.0f, 0.0f }; // Padding to 16-byte alignment
-}; // Total 80 bytes
+	float _pad[3] = { 0.0f, 0.0f, 0.0f }; // Padding to 16-byte alignment
+};
 
 struct SpotlightComponent
 {

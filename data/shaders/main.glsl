@@ -101,8 +101,9 @@ struct PointLight
     float quadratic;
     vec3 specular;
     float farPlane;
+    mat4 shadowMatrices[6]; // Cached projection * view matrices for 6 faces
     samplerCube shadowMap; // Bindless cubemap handle
-    float _pad[2];
+    float _pad[3];
 };
 
 struct SpotLight

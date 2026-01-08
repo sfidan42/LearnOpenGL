@@ -3,15 +3,18 @@
 #include <glad/glad.h>
 #include "Shader.hpp"
 #include <entt/entity/registry.hpp>
+#include <functional>
 #include "Components.hpp"
-#include "Shadow.hpp"
 
 using namespace glm;
+
+// Callback type for drawing models during shadow passes
+using DrawModelsCallback = std::function<void(const Shader&)>;
 
 class LightManager
 {
 public:
-	LightManager(const Shader& mainShader, const Shader& skyShader);
+	LightManager(const Shader& mainShader, const Shader& skyShader, const Shader& shadowMapShader);
 	~LightManager();
 
 	entt::entity createPointLight(const vec3& position, const vec3& color);
@@ -30,13 +33,13 @@ public:
 	void deleteSpotlight(entt::entity lightEntity);
 	void deleteDirLight(entt::entity lightEntity);
 
-	// Access internal registry for shadow rendering
-	[[nodiscard]] entt::registry& getLightRegistry() { return lightRegistry; }
-	[[nodiscard]] ShadowManager& getShadowManager() { return shadowManager; }
+	// Shadow rendering - takes shaders and a callback to draw models
+	void renderDirLightShadows(const DrawModelsCallback& drawModels);
+	void renderPointLightShadows(const DrawModelsCallback& drawModels);
+	void renderSpotlightShadows(const DrawModelsCallback& drawModels);
 
 private:
 	entt::registry lightRegistry;
-	ShadowManager shadowManager;
 
 	GLuint pointLightSSBO = 0;
 	GLuint spotLightSSBO = 0;
@@ -44,7 +47,9 @@ private:
 
 	const Shader& cachedMainShader;
 	const Shader& cachedSkyShader;
+	const Shader& cachedShadowMapShader;
 
+	void recalcPointLightMatrices(entt::entity lightEntity);
 	void recalcSpotlightMatrix(entt::entity entityEntity);
 	void recalcDirLightMatrix(entt::entity entityEntity);
 
@@ -55,6 +60,35 @@ private:
 	void syncPointLights();
 	void syncSpotlights();
 	void syncDirLights();
+
+	// ============ Shadows ============ //
+
+	// Point light shadow maps (cube map)
+	GLuint64 createPointShadowMap(entt::entity lightEntity, uint32_t size = 1024);
+	void destroyPointShadowMap(entt::entity lightEntity);
+
+	// Spotlight shadow maps (2D perspective)
+	GLuint64 createSpotShadowMap(entt::entity lightEntity, uint32_t width = 1024, uint32_t height = 1024);
+	void destroySpotShadowMap(entt::entity lightEntity);
+
+	// Directional light shadow maps (2D orthographic)
+	GLuint64 createDirShadowMap(entt::entity lightEntity, uint32_t width = 4096, uint32_t height = 4096);
+	void destroyDirShadowMap(entt::entity lightEntity);
+
+	// Utility functions for light space matrices
+	static std::array<mat4, 6> getPointLightViewMatrices(const vec3& lightPos);
+	static mat4 getPointLightProjection(float nearPlane = 0.1f, float farPlane = 50.0f);
+	static mat4 getSpotLightSpaceMatrix(const vec3& position, const vec3& direction,
+										float outerCutOff, float nearPlane = 0.1f, float farPlane = 50.0f);
+	static mat4 getDirLightSpaceMatrix(const vec3& lightDir, float orthoSize = 20.0f,
+									   float nearPlane = 1.0f, float farPlane = 50.0f);
+
+	static constexpr float POINT_LIGHT_FAR_PLANE = 50.0f;
+
+	// Shadow texture setup helpers
+	static void setupPointShadowTexture(PointShadowMapComponent& comp);
+	static void setupSpotShadowTexture(SpotShadowMapComponent& comp);
+	static void setupDirShadowTexture(DirShadowMapComponent& comp);
 };
 
 void setupLightTracking(LightManager& lManager, entt::registry& registry, const Shader& mainShader);

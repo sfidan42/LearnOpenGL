@@ -24,9 +24,9 @@ void Camera::update(const float deltaTime)
 
 	const vec3 right = normalize(cross(front, up));
 
-	eye += right * speed.x * deltaTime * 5.0f;
-	eye += up * speed.y * deltaTime * 5.0f;
-	eye += front * speed.z * deltaTime * 5.0f;
+	eye += right * speed.x * deltaTime * 10.0f;
+	eye += up * speed.y * deltaTime * 10.0f;
+	eye += front * speed.z * deltaTime * 10.0f;
 
 	target = eye + front;
 }

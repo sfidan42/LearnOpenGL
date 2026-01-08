@@ -14,17 +14,14 @@ public:
 
 	bool init(SDL_Window* sdlWindow);
 	void event(const SDL_Event& event);
-	void render(float deltaTime);
+	void update(float deltaTime);
 
 	entt::entity loadModel(const string& modelPath, const TransformComponent& transform);
 
 	LightManager& getLightManager() const { return *lightManager; }
 
 private:
-	void renderShadowPass();
-	void renderPointLightShadows();
-	void renderSpotlightShadows();
-	void renderScene();
+	void renderScene(const DrawModelsCallback& drawModels) const;
 
 	SDL_Window* window = nullptr;
 	SDL_GLContext glContext = nullptr;

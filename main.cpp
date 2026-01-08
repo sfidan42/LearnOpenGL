@@ -144,7 +144,7 @@ static void updateScene(Renderer& renderer, const Data& gameData, const float de
 	dirLight.direction = sunDirection;
 	lightManager.updateDirLight(aux);
 
-	renderer.render(deltaTime);
+	renderer.update(deltaTime);
 }
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
