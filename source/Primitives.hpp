@@ -32,9 +32,10 @@ using Index = uint32_t;
 
 enum class SSBOBindingPoint : GLuint
 {
-	PointLights,
-	Spotlights,
 	DiffuseTextures,
 	SpecularTextures,
 	NormalTextures,
+	PointLights,
+	Spotlights,
+	DirLights,
 };

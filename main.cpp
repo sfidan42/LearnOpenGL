@@ -8,15 +8,31 @@
 
 using namespace glm;
 
+struct Data
+{
+	vector<entt::entity> pointLights;
+	vector<entt::entity> spotlights;
+	vector<entt::entity> dirLights;
+	vector<entt::entity> modelInstances;
+};
+
 struct AppState
 {
 	SDL_Window* window = nullptr;
 	Renderer renderer;
+	Data gameData;
 	bool initialized = false;
 };
 
-static void setupScene(Renderer& renderer)
+static void setupScene(Renderer& renderer, Data& inGameData)
 {
+	inGameData.pointLights.reserve(4);
+	inGameData.spotlights.reserve(4);
+	inGameData.dirLights.reserve(1);
+	inGameData.modelInstances.reserve(32);
+
+	entt::entity aux;
+
 	const vector backpackPositions = {
 		vec3(0.0f, 0.0f, 0.0f),
 		vec3(2.0f, 5.0f, -15.0f),
@@ -34,7 +50,7 @@ static void setupScene(Renderer& renderer)
 	{
 		backpackTransforms[i].position = backpackPositions[i];
 		backpackTransforms[i].scale = vec3(0.2f);
-		const float angle = 20.0f * i; // degrees
+		const float angle = 20.0f * static_cast<float>(i); // degrees
 		auto axis = vec3(1.0f, 0.3f, 0.5f);
 		quat q = angleAxis(radians(angle), normalize(axis));
 		backpackTransforms[i].rotation = eulerAngles(q);
@@ -45,18 +61,36 @@ static void setupScene(Renderer& renderer)
 	};
 
 	for(const TransformComponent& transform : backpackTransforms)
-		renderer.loadModel("backpack/backpack.obj", transform);
+	{
+		aux = renderer.loadModel("backpack/backpack.obj", transform);
+		inGameData.modelInstances.push_back(aux);
+	}
 
 	for(const TransformComponent& transform : tilesTransforms)
-		renderer.loadModel("interior_tiles_1k.glb", transform);
+	{
+		aux = renderer.loadModel("interior_tiles_1k.glb", transform);
+		inGameData.modelInstances.push_back(aux);
+	}
 
-	const PointLight pLight = renderer.lightManager->createPointLight(
+	LightManager& lightManager = renderer.getLightManager();
+
+	// Create directional light (sun)
+	aux = lightManager.createDirLight(
+		normalize(vec3(-0.1f, -1.0f, -0.3f)), // direction
+		vec3(1.0f, 1.0f, 0.9f) // warm sunlight color
+	);
+	inGameData.dirLights.push_back(aux);
+
+	aux = lightManager.createPointLight(
 		vec3(8.0f, 1.0f, 8.0f), // position
 		vec3(1.0f, 1.0f, 1.0f) // color
 	);
-	pLight.lightData.diffuse.r = 0.0f;
-	pLight.lightData.specular.r = 0.0f;
-	renderer.lightManager->updatePointLight(pLight);
+	inGameData.pointLights.push_back(aux);
+	PointLightComponent& pLight = lightManager.getPointLight(aux);
+	// Set red channel to 0 to create cyan light
+	pLight.diffuse.r = 0.0f;
+	pLight.specular.r = 0.0f;
+	lightManager.updatePointLight(aux);
 
 	constexpr vec3 spotPositions[] = {
 		vec3(-2.0f, 5.0f, -2.0f),
@@ -70,11 +104,12 @@ static void setupScene(Renderer& renderer)
 	};
 	for(int i = 0; i < 3; ++i)
 	{
-		renderer.lightManager->createSpotlight(
+		aux = lightManager.createSpotlight(
 			spotPositions[i],
 			normalize(vec3(0, -1.0f, 0)),
 			spotColors[i]
 		);
+		inGameData.spotlights.push_back(aux);
 	}
 
 	TransformComponent boxTransform{
@@ -82,10 +117,36 @@ static void setupScene(Renderer& renderer)
 		.rotation = vec3(0.0f),
 		.scale = vec3(0.05f)
 	};
-	renderer.loadModel("Cardboard_Box.fbx", boxTransform);
+	aux = renderer.loadModel("Cardboard_Box.fbx", boxTransform);
+	inGameData.modelInstances.push_back(aux);
 	boxTransform.scale *= 0.3f;
 	boxTransform.position *= 0.3f;
-	renderer.loadModel("Cardboard_Box.fbx", boxTransform);
+	aux = renderer.loadModel("Cardboard_Box.fbx", boxTransform);
+	inGameData.modelInstances.push_back(aux);
+
+	cout << "Scene setup complete." << endl;
+	cout << "Number of model instances: " << inGameData.modelInstances.size() << endl;
+	cout << "Number of point lights: " << inGameData.pointLights.size() << endl;
+	cout << "Number of spotlights: " << inGameData.spotlights.size() << endl;
+	cout << "Number of directional lights: " << inGameData.dirLights.size() << endl;
+}
+
+static void updateScene(Renderer& renderer, const Data& gameData, const float deltaTime)
+{
+	LightManager& lightManager = renderer.getLightManager();
+	// Animate directional light (sun) over time
+	static float sunAngle = 0.0f; // in degrees
+	sunAngle += 10.0f * deltaTime; // degrees per second
+	if(sunAngle >= 360.0f)
+		sunAngle -= 360.0f;
+	const vec3 sunDirection = normalize(vec3(cos(radians(sunAngle)), -1.0f, sin(radians(sunAngle))));
+
+	entt::entity aux = gameData.dirLights[0];
+	DirLightComponent& dirLight = lightManager.getDirLight(aux);
+	dirLight.direction = sunDirection;
+	lightManager.updateDirLight(aux);
+
+	renderer.render(deltaTime);
 }
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
@@ -120,7 +181,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 		return SDL_APP_FAILURE;
 	}
 
-	setupScene(state->renderer);
+	setupScene(state->renderer, state->gameData);
 	state->initialized = true;
 
 	*appstate = state;
@@ -129,12 +190,18 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 
 SDL_AppResult SDL_AppIterate(void* appstate)
 {
+	static float lastTicks = SDL_GetTicks();
+
 	const auto state = static_cast<AppState*>(appstate);
 
 	if(!state || !state->initialized)
 		return SDL_APP_FAILURE;
 
-	state->renderer.iterate();
+	const float currentTicks = SDL_GetTicks();
+	const float deltaTime = (currentTicks - lastTicks) / 1000.0f;
+	lastTicks = currentTicks;
+
+	updateScene(state->renderer, state->gameData, deltaTime);
 	return SDL_APP_CONTINUE;
 }
 
@@ -158,7 +225,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
 	}
 
 	if(state->initialized)
-		state->renderer.handleEvent(*event);
+		state->renderer.event(*event);
 
 	return SDL_APP_CONTINUE;
 }
@@ -170,6 +237,6 @@ void SDL_AppQuit(void* appstate, SDL_AppResult /*result*/)
 	auto* state = static_cast<AppState*>(appstate);
 	// Renderer destructor handles OpenGL cleanup, window is destroyed here
 	SDL_DestroyWindow(state->window);
-	state->initialized = false;
+	state->initialized = false; // just in case
 	delete state;
 }

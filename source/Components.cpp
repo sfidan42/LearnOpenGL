@@ -1,6 +1,17 @@
 #include "Components.hpp"
 #include <glm/ext.hpp>
 
+mat4 TransformComponent::bake() const
+{
+	mat4 modelMat(1.0f);
+	modelMat = translate(modelMat, position);
+	modelMat = rotate(modelMat, rotation.x, {1.0f, 0.0f, 0.0f});
+	modelMat = rotate(modelMat, rotation.y, {0.0f, 1.0f, 0.0f});
+	modelMat = rotate(modelMat, rotation.z, {0.0f, 0.0f, 1.0f});
+	modelMat = glm::scale(modelMat, scale);
+	return modelMat;
+}
+
 void onInstanceAdded(entt::registry& registry, const entt::entity instanceEnt)
 {
 	auto& [modelEntity] = registry.get<InstanceComponent>(instanceEnt);
@@ -30,15 +41,13 @@ void onInstanceRemoved(entt::registry& registry, const entt::entity instanceEnt)
 	erase(instances, instanceEnt);
 }
 
-mat4 TransformComponent::bake() const
+void setupInstanceTracking(entt::registry& registry)
 {
-	mat4 modelMat(1.0f);
-	modelMat = translate(modelMat, position);
-	modelMat = rotate(modelMat, rotation.x, {1, 0, 0});
-	modelMat = rotate(modelMat, rotation.y, {0, 1, 0});
-	modelMat = rotate(modelMat, rotation.z, {0, 0, 1});
-	modelMat = glm::scale(modelMat, scale);
-	return modelMat;
+	registry.on_construct<InstanceComponent>()
+			.connect<&onInstanceAdded>();
+
+	registry.on_destroy<InstanceComponent>()
+			.connect<&onInstanceRemoved>();
 }
 
 void ModelComponent::drawInstanced(const Shader& shader) const
@@ -47,13 +56,4 @@ void ModelComponent::drawInstanced(const Shader& shader) const
 		return;
 	shader.use();
 	model.drawInstanced(shader, instanceMatrices);
-}
-
-void setupInstanceTracking(entt::registry& registry)
-{
-	registry.on_construct<InstanceComponent>()
-			.connect<&onInstanceAdded>();
-
-	registry.on_destroy<InstanceComponent>()
-			.connect<&onInstanceRemoved>();
 }

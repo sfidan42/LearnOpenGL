@@ -1,14 +1,10 @@
 #pragma once
-#include <glad/glad.h>
 #include <SDL3/SDL.h>
-#include <vector>
-
 #include "Camera.hpp"
 #include "Shader.hpp"
 #include "Components.hpp"
 #include "Light.hpp"
 #include "Skybox.hpp"
-#include "Shadow.hpp"
 
 class Renderer
 {
@@ -17,12 +13,12 @@ public:
 	~Renderer();
 
 	bool init(SDL_Window* sdlWindow);
-	void iterate();
-	void handleEvent(const SDL_Event& event);
+	void event(const SDL_Event& event);
+	void render(float deltaTime);
 
-	void loadModel(const string& modelPath, const TransformComponent& transform);
+	entt::entity loadModel(const string& modelPath, const TransformComponent& transform);
 
-	LightManager* lightManager = nullptr;
+	LightManager& getLightManager() const { return *lightManager; }
 
 private:
 	void renderShadowPass();
@@ -37,7 +33,7 @@ private:
 	Shader* shadowMapShader = nullptr;
 	Shader* shadowPointShader = nullptr;
 	Skybox* skybox = nullptr;
-	ShadowMap* shadowMap = nullptr;
+	LightManager* lightManager = nullptr;
 
 	Camera camera;
 

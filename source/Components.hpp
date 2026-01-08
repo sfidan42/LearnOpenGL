@@ -28,6 +28,8 @@ struct InstanceComponent
 	entt::entity modelEntity;
 };
 
+void setupInstanceTracking(entt::registry& registry);
+
 struct ModelComponent
 {
 	string path;
@@ -48,37 +50,38 @@ struct PointLightComponent
 	float quadratic; // Row 3: 16 bytes
 	vec3 specular;
 	float farPlane; // Row 4: 16 bytes - far plane for shadow calculation
-	uint64_t shadowMapHandle; // Bindless cubemap handle (8 bytes)
-	float _pad[2]; // Padding to 16-byte alignment
+	uint64_t cubeMapHandle; // Bindless cube map handle (8 bytes)
+	float _pad[2] = { 0.0f, 0.0f }; // Padding to 16-byte alignment
 }; // Total 80 bytes
 
 struct SpotlightComponent
 {
 	vec3 position;
-	float cutOff; // Row 1
+	float cutOff; // Row 1: 16 bytes
 	vec3 direction;
-	float outerCutOff; // Row 2
+	float outerCutOff; // Row 2: 16 bytes
 	vec3 ambient;
-	float constant; // Row 3
+	float constant; // Row 3: 16 bytes
 	vec3 diffuse;
-	float linear; // Row 4
+	float linear; // Row 4: 16 bytes
 	vec3 specular;
-	float quadratic; // Row 5
+	float quadratic; // Row 5: 16 bytes
 	mat4 lightSpaceMatrix; // Rows 6-9: 64 bytes
 	uint64_t shadowMapHandle; // Bindless 2D shadow map handle (8 bytes)
-	float _pad[2]; // Padding to 16-byte alignment
+	float _pad[2] = { 0.0f, 0.0f }; // Padding to 16-byte alignment
 }; // Total 160 bytes
 
 struct DirLightComponent
 {
 	vec3 direction;
-	float _pad0;
+	float _pad0 = 0.0f; // Row 1: 16 bytes
 	vec3 ambient;
-	float _pad1;
+	float _pad1 = 0.0f; // Row 2: 16 bytes
 	vec3 diffuse;
-	float _pad2;
+	float _pad2 = 0.0f; // Row 3: 16 bytes
 	vec3 specular;
-	float _pad3;
-};
-
-void setupInstanceTracking(entt::registry& registry);
+	float _pad3 = 0.0f; // Row 4: 16 bytes
+	mat4 lightSpaceMatrix; // Rows 5-8: 64 bytes
+	uint64_t shadowMapHandle; // Bindless 2D shadow map handle (8 bytes)
+	float _pad4[2] = { 0.0f, 0.0f }; // Padding to 16-byte alignment
+}; // Total 144 bytes

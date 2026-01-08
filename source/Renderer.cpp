@@ -5,7 +5,6 @@
 #include "Camera.hpp"
 #include <stb_image.h>
 #include <iostream>
-#include <algorithm>
 
 Renderer::~Renderer()
 {
@@ -17,7 +16,6 @@ Renderer::~Renderer()
 	delete shadowMapShader;
 	delete shadowPointShader;
 	delete skybox;
-	delete shadowMap;
 	if(glContext)
 		SDL_GL_DestroyContext(glContext);
 	// Note: SDL_Window is owned by AppState in main.cpp, not by Renderer
@@ -111,13 +109,6 @@ bool Renderer::init(SDL_Window* sdlWindow)
 		return false;
 	}
 
-	// Initialize shadow map (2048x2048 resolution)
-	shadowMap = new ShadowMap(2048, 2048);
-
-	// Set shadow map texture unit in main shader
-	mainShader->use();
-	mainShader->setInt("shadowMap", 5); // Use texture unit 5 for shadow map
-
 	skybox = new Skybox();
 
 	const string faces[6] = {
@@ -142,30 +133,7 @@ bool Renderer::init(SDL_Window* sdlWindow)
 	return true;
 }
 
-void Renderer::iterate()
-{
-	const auto currentTime = static_cast<float>(SDL_GetTicks()) / 1000.0f;
-	const float deltaTime = currentTime - lastTime;
-	lastTime = currentTime;
-
-	lightManager->update(deltaTime);
-	camera.update(deltaTime);
-
-	// Update light space matrices before shadow rendering
-	lightManager->updateSpotlightMatrices();
-
-	// ========== PASS 1: Shadow Maps ==========
-	renderShadowPass(); // Directional light
-	renderPointLightShadows(); // Point lights (cube maps)
-	renderSpotlightShadows(); // Spotlights (2D)
-
-	// ========== PASS 2: Main Scene ==========
-	renderScene();
-
-	SDL_GL_SwapWindow(window);
-}
-
-void Renderer::handleEvent(const SDL_Event& event)
+void Renderer::event(const SDL_Event& event)
 {
 	switch(event.type)
 	{
@@ -250,7 +218,22 @@ void Renderer::handleEvent(const SDL_Event& event)
 	}
 }
 
-void Renderer::loadModel(const string& modelPath, const TransformComponent& transform)
+void Renderer::render(const float deltaTime)
+{
+	camera.update(deltaTime);
+
+	// ========== PASS 1: Shadow Maps ==========
+	renderShadowPass(); // Directional light (2D)
+	renderPointLightShadows(); // Point lights (cube maps)
+	renderSpotlightShadows(); // Spotlights (2D)
+
+	// ========== PASS 2: Main Scene ==========
+	renderScene();
+
+	SDL_GL_SwapWindow(window);
+}
+
+entt::entity Renderer::loadModel(const string& modelPath, const TransformComponent& transform)
 {
 	// TODO: some models need glCullFace(GL_FRONT), others GL_BACK or disabled culling
 	entt::entity modelEntity = entt::null;
@@ -283,16 +266,21 @@ void Renderer::loadModel(const string& modelPath, const TransformComponent& tran
 	const entt::entity instance = modelRegistry.create();
 	modelRegistry.emplace<InstanceComponent>(instance, modelEntity);
 	modelRegistry.emplace<TransformComponent>(instance, transform);
-	// TODO: when scale is different thatn (1,1,1), position and rotation may need adjustment
+	cout << "Instance created for model: " << modelPath << endl;
+	// TODO: when scale is different than (1,1,1), position and rotation may need adjustment
 
 	// 3. Bake the transform and add it to the ModelComponent's instanceMatrices
 	auto& modelComp = modelRegistry.get<ModelComponent>(modelEntity);
 	modelComp.instanceMatrices.emplace_back(transform.bake());
+
+	return instance;
 }
 
 void Renderer::renderShadowPass()
 {
-	shadowMap->bindForWriting();
+	auto& lightRegistry = lightManager->getLightRegistry();
+	if(lightRegistry.storage<DirLightShadowMap>().empty())
+		return;
 
 	// Use back-face culling so front faces are rendered to shadow map
 	// This properly shadows objects below surfaces (floors, roofs, etc.)
@@ -304,22 +292,22 @@ void Renderer::renderShadowPass()
 
 	shadowMapShader->use();
 
-	// Calculate light space matrix from sun direction
-	const vec3 sunDir = lightManager->getSunDirection();
-	const mat4 lightSpaceMatrix = ShadowMap::getLightSpaceMatrix(sunDir, 30.0f, 0.1f, 100.0f);
-	shadowMapShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
-
-	// Also send to main shader for fragment shader use
-	mainShader->use();
-	mainShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
-
-	// Render all models to shadow map
-	shadowMapShader->use();
-	const auto modelView = modelRegistry.view<ModelComponent>();
-	modelView.each([&](const ModelComponent& modelComp)
+	// Render shadow map for each directional light
+	auto view = lightRegistry.view<DirLightComponent, DirLightShadowMap>();
+	for(auto [entity, light, dirShadowMap] : view.each())
 	{
-		modelComp.drawInstanced(*shadowMapShader);
-	});
+		dirShadowMap.bindForWriting();
+
+		// Use the lightSpaceMatrix from the component (updated in updateDirLightMatrices)
+		shadowMapShader->setMat4("lightSpaceMatrix", light.lightSpaceMatrix);
+
+		// Render all models to shadow map
+		const auto modelView = modelRegistry.view<ModelComponent>();
+		modelView.each([&](const ModelComponent& modelComp)
+		{
+			modelComp.drawInstanced(*shadowMapShader);
+		});
+	}
 
 	// Disable polygon offset
 	glDisable(GL_POLYGON_OFFSET_FILL);
@@ -439,12 +427,9 @@ void Renderer::renderScene()
 
 	camera.send(*mainShader, *skyboxShader);
 
-	// Bind directional shadow map for reading
-	shadowMap->bindForReading(GL_TEXTURE5);
-
 	mainShader->use();
 
-	// Point and spotlight shadow maps are now handled via bindless textures
+	// All shadow maps (directional, point, and spotlight) are now handled via bindless textures
 	// stored directly in the light SSBOs - no need to bind them here
 
 	const auto modelView = modelRegistry.view<ModelComponent>();

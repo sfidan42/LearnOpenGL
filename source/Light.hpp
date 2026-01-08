@@ -10,81 +10,66 @@
 
 using namespace glm;
 
-struct PointLight
-{
-	PointLight(PointLightComponent& component, entt::entity entity);
-	PointLightComponent& lightData;
-
-private:
-	entt::entity lightEntity;
-	friend class LightManager;
-};
-
-struct Spotlight
-{
-	Spotlight(SpotlightComponent& component, entt::entity entity);
-	SpotlightComponent& lightData;
-
-private:
-	entt::entity lightEntity;
-	friend class LightManager;
-};
-
 class LightManager
 {
 public:
 	LightManager(const Shader& mainShader, const Shader& skyShader);
 	~LightManager();
 
-	void update(float deltaTime);
-
-	PointLight createPointLight(
+	entt::entity createPointLight(
 		const vec3& position,
 		const vec3& color
 	);
 
-	Spotlight createSpotlight(
+	entt::entity createSpotlight(
 		const vec3& position,
 		const vec3& direction,
 		const vec3& color
 	);
 
-	void updatePointLight(const PointLight& light);
-	void updateSpotlight(const Spotlight& light);
+	entt::entity createDirLight(
+		const vec3& direction,
+		const vec3& color
+	);
 
-	void deletePointLight(const PointLight& light);
-	void deleteSpotlight(const Spotlight& light);
+	PointLightComponent& getPointLight(entt::entity entity);
+	SpotlightComponent& getSpotlight(entt::entity entity);
+	DirLightComponent& getDirLight(entt::entity entity);
 
-	[[nodiscard]] vec3 getSunDirection() const { return sunLight.direction; }
+	void updatePointLight(entt::entity lightEntity);
+	void updateSpotlight(entt::entity lightEntity);
+	void updateDirLight(entt::entity lightEntity);
+
+	void deletePointLight(entt::entity lightEntity);
+	void deleteSpotlight(entt::entity lightEntity);
+	void deleteDirLight(entt::entity lightEntity);
 
 	// Access internal registry for shadow rendering
 	[[nodiscard]] entt::registry& getLightRegistry() { return lightRegistry; }
 
-	// Update light space matrices (call before syncing)
-	void updateSpotlightMatrices();
-
 private:
-	DirLightComponent sunLight{};
-
 	entt::registry lightRegistry;
 
 	GLuint pointLightSSBO = 0;
 	GLuint spotLightSSBO = 0;
-
-	float timeOfDay = 0.0f;
+	GLuint sunLightSSBO = 0;
 
 	const Shader& cachedMainShader;
 	const Shader& cachedSkyShader;
 
-	void setupLightTracking();
-	void syncPointLights(entt::registry& registry, entt::entity entity);
-	void syncSpotlights(entt::registry& registry, entt::entity entity);
-	void syncSunLight() const;
+	void recalcSpotlightMatrix(entt::entity entity);
+	void recalcDirLightMatrix(entt::entity entity);
+
+	void syncPointLights();
+	void syncSpotlights();
+	void syncDirLights();
 
 	GLuint64 createPointLightShadowMap(entt::entity entity);
 	GLuint64 createSpotlightShadowMap(entt::entity entity);
+	GLuint64 createDirLightShadowMap(entt::entity entity);
 	void destroyPointLightShadowMap(entt::entity entity);
 	void destroySpotlightShadowMap(entt::entity entity);
+	void destroyDirLightShadowMap(entt::entity entity);
 };
 
 void setupLightTracking(LightManager& lManager, entt::registry& registry, const Shader& mainShader);

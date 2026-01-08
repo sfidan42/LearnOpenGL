@@ -4,6 +4,70 @@
 #include <stb_image.h>
 #include "Components.hpp"
 
+Mesh::~Mesh()
+{
+	cleanup();
+}
+
+Mesh::Mesh(Mesh&& other) noexcept
+: vertices(std::move(other.vertices)),
+  indices(std::move(other.indices)),
+  textures(std::move(other.textures)),
+  VAO(other.VAO),
+  VBO(other.VBO),
+  EBO(other.EBO),
+  instanceVBO(other.instanceVBO),
+  diffuseHandlesSSBO(other.diffuseHandlesSSBO),
+  specularHandlesSSBO(other.specularHandlesSSBO),
+  normalHandlesSSBO(other.normalHandlesSSBO),
+  diffuseHandles(std::move(other.diffuseHandles)),
+  specularHandles(std::move(other.specularHandles)),
+  normalHandles(std::move(other.normalHandles))
+{
+	// Nullify the source so it doesn't delete our resources
+	other.VAO = 0;
+	other.VBO = 0;
+	other.EBO = 0;
+	other.instanceVBO = 0;
+	other.diffuseHandlesSSBO = 0;
+	other.specularHandlesSSBO = 0;
+	other.normalHandlesSSBO = 0;
+}
+
+Mesh& Mesh::operator=(Mesh&& other) noexcept
+{
+	if(this != &other)
+	{
+		// Clean up our current resources
+		cleanup();
+
+		// Move data from other
+		vertices = std::move(other.vertices);
+		indices = std::move(other.indices);
+		textures = std::move(other.textures);
+		VAO = other.VAO;
+		VBO = other.VBO;
+		EBO = other.EBO;
+		instanceVBO = other.instanceVBO;
+		diffuseHandlesSSBO = other.diffuseHandlesSSBO;
+		specularHandlesSSBO = other.specularHandlesSSBO;
+		normalHandlesSSBO = other.normalHandlesSSBO;
+		diffuseHandles = std::move(other.diffuseHandles);
+		specularHandles = std::move(other.specularHandles);
+		normalHandles = std::move(other.normalHandles);
+
+		// Nullify the source
+		other.VAO = 0;
+		other.VBO = 0;
+		other.EBO = 0;
+		other.instanceVBO = 0;
+		other.diffuseHandlesSSBO = 0;
+		other.specularHandlesSSBO = 0;
+		other.normalHandlesSSBO = 0;
+	}
+	return *this;
+}
+
 void Mesh::setup(const vector<Vertex>& vertices, const vector<Index>& indices,
 				 const vector<TextureComponent>& textures)
 {
@@ -82,26 +146,6 @@ void Mesh::drawInstanced(const Shader& shader, const vector<mat4>& instanceMatri
 	glBindVertexArray(0);
 }
 
-void Mesh::bind(const Shader& shader) const
-{
-	// Bind Diffuse Handles SSBO
-	if(diffuseHandlesSSBO != 0)
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::DiffuseTextures), diffuseHandlesSSBO);
-
-	// Bind Specular Handles SSBO
-	if(specularHandlesSSBO != 0)
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::SpecularTextures), specularHandlesSSBO);
-
-	// Bind Normal Handles SSBO
-	if(normalHandlesSSBO != 0)
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::NormalTextures), normalHandlesSSBO);
-
-	// Set counts
-	shader.setInt("u_numDiffuseTextures", static_cast<int>(diffuseHandles.size()));
-	shader.setInt("u_numSpecularTextures", static_cast<int>(specularHandles.size()));
-	shader.setInt("u_numNormalTextures", static_cast<int>(normalHandles.size()));
-}
-
 void Mesh::cleanup()
 {
 	// NOTE: Textures are NOT deleted here because they are shared across meshes
@@ -152,68 +196,24 @@ void Mesh::cleanup()
 	textures.clear();
 }
 
-Mesh::~Mesh()
+void Mesh::bind(const Shader& shader) const
 {
-	cleanup();
-}
+	// Bind Diffuse Handles SSBO
+	if(diffuseHandlesSSBO != 0)
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::DiffuseTextures), diffuseHandlesSSBO);
 
-Mesh::Mesh(Mesh&& other) noexcept
-: vertices(std::move(other.vertices)),
-  indices(std::move(other.indices)),
-  textures(std::move(other.textures)),
-  VAO(other.VAO),
-  VBO(other.VBO),
-  EBO(other.EBO),
-  instanceVBO(other.instanceVBO),
-  diffuseHandlesSSBO(other.diffuseHandlesSSBO),
-  specularHandlesSSBO(other.specularHandlesSSBO),
-  normalHandlesSSBO(other.normalHandlesSSBO),
-  diffuseHandles(std::move(other.diffuseHandles)),
-  specularHandles(std::move(other.specularHandles)),
-  normalHandles(std::move(other.normalHandles))
-{
-	// Nullify the source so it doesn't delete our resources
-	other.VAO = 0;
-	other.VBO = 0;
-	other.EBO = 0;
-	other.instanceVBO = 0;
-	other.diffuseHandlesSSBO = 0;
-	other.specularHandlesSSBO = 0;
-	other.normalHandlesSSBO = 0;
-}
+	// Bind Specular Handles SSBO
+	if(specularHandlesSSBO != 0)
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::SpecularTextures), specularHandlesSSBO);
 
-Mesh& Mesh::operator=(Mesh&& other) noexcept
-{
-	if(this != &other)
-	{
-		// Clean up our current resources
-		cleanup();
+	// Bind Normal Handles SSBO
+	if(normalHandlesSSBO != 0)
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::NormalTextures), normalHandlesSSBO);
 
-		// Move data from other
-		vertices = std::move(other.vertices);
-		indices = std::move(other.indices);
-		textures = std::move(other.textures);
-		VAO = other.VAO;
-		VBO = other.VBO;
-		EBO = other.EBO;
-		instanceVBO = other.instanceVBO;
-		diffuseHandlesSSBO = other.diffuseHandlesSSBO;
-		specularHandlesSSBO = other.specularHandlesSSBO;
-		normalHandlesSSBO = other.normalHandlesSSBO;
-		diffuseHandles = std::move(other.diffuseHandles);
-		specularHandles = std::move(other.specularHandles);
-		normalHandles = std::move(other.normalHandles);
-
-		// Nullify the source
-		other.VAO = 0;
-		other.VBO = 0;
-		other.EBO = 0;
-		other.instanceVBO = 0;
-		other.diffuseHandlesSSBO = 0;
-		other.specularHandlesSSBO = 0;
-		other.normalHandlesSSBO = 0;
-	}
-	return *this;
+	// Set counts
+	shader.setInt("u_numDiffuseTextures", static_cast<int>(diffuseHandles.size()));
+	shader.setInt("u_numSpecularTextures", static_cast<int>(specularHandles.size()));
+	shader.setInt("u_numNormalTextures", static_cast<int>(normalHandles.size()));
 }
 
 bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID)
@@ -251,19 +251,30 @@ bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents
 	return format != -1;
 }
 
-GLuint CreateTextureHandleSSBO(const vector<GLuint64>& handles)
+GLuint TextureFromFile(const string& fullPath, GLuint64& outHandle)
 {
-	if(handles.empty())
-		return 0;
+	unsigned int textureID = 0;
+	glGenTextures(1, &textureID);
 
-	GLuint ssbo = 0;
-	glGenBuffers(1, &ssbo);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-	glBufferData(GL_SHADER_STORAGE_BUFFER,
-				 handles.size() * sizeof(GLuint64),
-				 handles.data(),
-				 GL_STATIC_DRAW);
-	return ssbo;
+	int width, height, nrComponents;
+	unsigned char* data = stbi_load(fullPath.c_str(), &width, &height, &nrComponents, 0);
+	if(data)
+	{
+		if(!ProcessTexture(data, width, height, nrComponents, textureID))
+			cout << "Failed to process texture at path: " << fullPath << endl;
+		stbi_image_free(data);
+	}
+	else
+	{
+		cout << "TextureComponent failed to load at path: " << fullPath << endl;
+		stbi_image_free(data);
+	}
+
+	// Get bindless texture handle and make it resident
+	outHandle = glGetTextureHandleARB(textureID);
+	glMakeTextureHandleResidentARB(outHandle);
+
+	return textureID;
 }
 
 bool LoadEmbeddedTextureData(const aiTexture* atex, GLuint& textureID, GLuint64& outHandle)
@@ -333,30 +344,19 @@ bool LoadEmbeddedTextureData(const aiTexture* atex, GLuint& textureID, GLuint64&
 	return success;
 }
 
-GLuint TextureFromFile(const string& fullPath, GLuint64& outHandle)
+GLuint CreateTextureHandleSSBO(const vector<GLuint64>& handles)
 {
-	unsigned int textureID = 0;
-	glGenTextures(1, &textureID);
+	if(handles.empty())
+		return 0;
 
-	int width, height, nrComponents;
-	unsigned char* data = stbi_load(fullPath.c_str(), &width, &height, &nrComponents, 0);
-	if(data)
-	{
-		if(!ProcessTexture(data, width, height, nrComponents, textureID))
-			cout << "Failed to process texture at path: " << fullPath << endl;
-		stbi_image_free(data);
-	}
-	else
-	{
-		cout << "TextureComponent failed to load at path: " << fullPath << endl;
-		stbi_image_free(data);
-	}
-
-	// Get bindless texture handle and make it resident
-	outHandle = glGetTextureHandleARB(textureID);
-	glMakeTextureHandleResidentARB(outHandle);
-
-	return textureID;
+	GLuint ssbo = 0;
+	glGenBuffers(1, &ssbo);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+	glBufferData(GL_SHADER_STORAGE_BUFFER,
+				 handles.size() * sizeof(GLuint64),
+				 handles.data(),
+				 GL_STATIC_DRAW);
+	return ssbo;
 }
 
 Model::Model(const string& modelPath)
@@ -369,6 +369,75 @@ Model::Model(const string& modelPath)
 	for(auto [ent, tex] : texturesView.each())
 		cout << "\tTextureComponent ID: " << tex.id << ", Type: " << tex.type << ", Path: " << tex.path << endl;
 	cout << "----------------------------------------" << endl;
+}
+
+Model::~Model()
+{
+	// Check if this Model was moved-from (registry is empty/invalid after move)
+	// We check by seeing if there's any storage at all
+	if(registry.storage<entt::entity>().empty())
+		return;
+
+	// First, clean up all textures (they are shared across meshes)
+	auto texturesView = registry.view<TextureComponent>();
+	for(auto [ent, tex] : texturesView.each())
+	{
+		// Make bindless handle non-resident before deleting
+		if(tex.handle != 0)
+			glMakeTextureHandleNonResidentARB(tex.handle);
+
+		// Delete the OpenGL texture
+		if(tex.id != 0)
+			glDeleteTextures(1, &tex.id);
+	}
+
+	// Clear the registry - this will destroy Mesh components which clean up their own VAO/VBO/EBO/SSBOs
+	registry.clear();
+}
+
+Model::Model(Model&& other) noexcept
+: directory(std::move(other.directory)),
+  registry(std::move(other.registry))
+{
+	// Mark the source as moved-from by clearing its directory
+	other.directory.clear();
+}
+
+Model& Model::operator=(Model&& other) noexcept
+{
+	if(this != &other)
+	{
+		// Clean up our current resources first (same logic as destructor)
+		if(!registry.storage<entt::entity>().empty())
+		{
+			auto texturesView = registry.view<TextureComponent>();
+			for(auto [ent, tex] : texturesView.each())
+			{
+				if(tex.handle != 0)
+					glMakeTextureHandleNonResidentARB(tex.handle);
+				if(tex.id != 0)
+					glDeleteTextures(1, &tex.id);
+			}
+			registry.clear();
+		}
+
+		// Move from other
+		directory = std::move(other.directory);
+		registry = std::move(other.registry);
+
+		// Mark the source as moved-from
+		other.directory.clear();
+	}
+	return *this;
+}
+
+void Model::drawInstanced(const Shader& shader, const vector<mat4>& instanceMatrices) const
+{
+	const auto view = registry.view<Mesh>();
+	view.each([&shader, &instanceMatrices](const Mesh& mesh)
+	{
+		mesh.drawInstanced(shader, instanceMatrices);
+	});
 }
 
 void Model::loadModel(const string& modelPath)
@@ -618,73 +687,4 @@ const aiTexture* Model::findEmbeddedTexture(const aiScene* scene, const string& 
 		}
 	}
 	return nullptr;
-}
-
-Model::~Model()
-{
-	// Check if this Model was moved-from (registry is empty/invalid after move)
-	// We check by seeing if there's any storage at all
-	if(registry.storage<entt::entity>().empty())
-		return;
-
-	// First, clean up all textures (they are shared across meshes)
-	auto texturesView = registry.view<TextureComponent>();
-	for(auto [ent, tex] : texturesView.each())
-	{
-		// Make bindless handle non-resident before deleting
-		if(tex.handle != 0)
-			glMakeTextureHandleNonResidentARB(tex.handle);
-
-		// Delete the OpenGL texture
-		if(tex.id != 0)
-			glDeleteTextures(1, &tex.id);
-	}
-
-	// Clear the registry - this will destroy Mesh components which clean up their own VAO/VBO/EBO/SSBOs
-	registry.clear();
-}
-
-Model::Model(Model&& other) noexcept
-: directory(std::move(other.directory)),
-  registry(std::move(other.registry))
-{
-	// Mark the source as moved-from by clearing its directory
-	other.directory.clear();
-}
-
-Model& Model::operator=(Model&& other) noexcept
-{
-	if(this != &other)
-	{
-		// Clean up our current resources first (same logic as destructor)
-		if(!registry.storage<entt::entity>().empty())
-		{
-			auto texturesView = registry.view<TextureComponent>();
-			for(auto [ent, tex] : texturesView.each())
-			{
-				if(tex.handle != 0)
-					glMakeTextureHandleNonResidentARB(tex.handle);
-				if(tex.id != 0)
-					glDeleteTextures(1, &tex.id);
-			}
-			registry.clear();
-		}
-
-		// Move from other
-		directory = std::move(other.directory);
-		registry = std::move(other.registry);
-
-		// Mark the source as moved-from
-		other.directory.clear();
-	}
-	return *this;
-}
-
-void Model::drawInstanced(const Shader& shader, const vector<mat4>& instanceMatrices) const
-{
-	const auto view = registry.view<Mesh>();
-	view.each([&shader, &instanceMatrices](const Mesh& mesh)
-	{
-		mesh.drawInstanced(shader, instanceMatrices);
-	});
 }

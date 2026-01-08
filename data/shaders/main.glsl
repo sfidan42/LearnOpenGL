@@ -8,12 +8,10 @@ layout (location = 4) in mat4 aInstanceMatrix;
 
 uniform mat4 projection;
 uniform mat4 view;
-uniform mat4 lightSpaceMatrix;
 
 out vec3 FragPos;
 out vec2 TexCoord;
 out mat3 TBN;
-out vec4 FragPosLightSpace;
 
 void main()
 {
@@ -33,7 +31,6 @@ void main()
 
     TBN = mat3(T, B, N);
 
-    FragPosLightSpace = lightSpaceMatrix * vec4(FragPos, 1.0);
 
     gl_Position = projection * view * vec4(FragPos, 1.0);
 }
@@ -48,25 +45,22 @@ void main()
 in vec3 FragPos;
 in vec2 TexCoord;
 in mat3 TBN;
-in vec4 FragPosLightSpace;
 
 out vec4 FragColor;
 
-// ================= SHADOW MAP =================
-uniform sampler2DShadow shadowMap;
 
 
 // ================= BINDLESS TEXTURE HANDLES =================
 // Texture handles stored in SSBOs for unlimited textures
-layout(std430, binding = 2) buffer DiffuseTextureHandles {
+layout(std430, binding = 0) buffer DiffuseTextureHandles {
     sampler2D diffuseTextures[];
 };
 
-layout(std430, binding = 3) buffer SpecularTextureHandles {
+layout(std430, binding = 1) buffer SpecularTextureHandles {
     sampler2D specularTextures[];
 };
 
-layout(std430, binding = 4) buffer NormalTextureHandles {
+layout(std430, binding = 2) buffer NormalTextureHandles {
     sampler2D normalTextures[];
 };
 
@@ -77,13 +71,25 @@ uniform int u_numNormalTextures;
 float shininess = 32;
 
 // ================= LIGHTS =================
-struct DirLight
+struct DirLightComponent
 {
     vec3 direction;
+    float pad0;
+
     vec3 ambient;
+    float pad1;
+
     vec3 diffuse;
+    float pad2;
+
     vec3 specular;
+    float pad3;
+
+    mat4 lightSpaceMatrix;
+    sampler2DShadow shadowMap; // Bindless 2D shadow map handle
+    float pad4[2];
 };
+
 
 struct PointLight
 {
@@ -116,19 +122,22 @@ struct SpotLight
     float _pad[2];
 };
 
-uniform DirLight sunLight;
-
 // SSBOs for dynamic number of lights
-layout(std430, binding = 0) buffer PointLightBuffer {
+layout(std430, binding = 3) buffer PointLightBuffer {
     PointLight pointLights[];
 };
 
-layout(std430, binding = 1) buffer SpotLightBuffer {
+layout(std430, binding = 4) buffer SpotLightBuffer {
     SpotLight spotLights[];
+};
+
+layout(std430, binding = 5) buffer DirLightBuffer {
+    DirLightComponent dirLights[];
 };
 
 uniform int u_numPointLights;
 uniform int u_numSpotLights;
+uniform int u_numDirLights;
 
 uniform vec3 viewPos;
 
@@ -136,11 +145,11 @@ uniform vec3 viewPos;
 vec3 GetNormal();
 vec3 GetDiffuseColor();
 vec3 GetSpecularColor();
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir);
+float DirShadowCalculation(DirLightComponent light, vec3 fragPos, vec3 normal, vec3 lightDir);
 float PointShadowCalculation(PointLight light, vec3 fragPos);
 float SpotShadowCalculation(SpotLight light, vec3 fragPos, vec3 normal, vec3 lightDir);
 
-vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, float shadow);
+vec3 CalcDirLight(DirLightComponent light, vec3 normal, vec3 fragPos, vec3 viewDir);
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 
@@ -152,11 +161,9 @@ void main()
 
     vec3 result = vec3(0.0);
 
-    // Calculate shadow for directional light
-    vec3 lightDir = normalize(-sunLight.direction);
-    float shadow = ShadowCalculation(FragPosLightSpace, norm, lightDir);
-
-    result += CalcDirLight(sunLight, norm, viewDir, shadow);
+    // Calculate all directional lights
+    for (int i = 0; i < u_numDirLights; i++)
+        result += CalcDirLight(dirLights[i], norm, FragPos, viewDir);
 
     for (int i = 0; i < u_numPointLights; i++)
         result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
@@ -236,16 +243,20 @@ const vec2 poissonDisk[16] = vec2[](
     vec2(0.14383161, -0.14100790)
 );
 
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
+float DirShadowCalculation(DirLightComponent light, vec3 fragPos, vec3 normal, vec3 lightDir)
 {
+    // Transform fragment position to light space using the light's matrix
+    vec4 fragPosLightSpace = light.lightSpaceMatrix * vec4(fragPos, 1.0);
+
     // Perform perspective divide
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
 
     // Transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
 
-    // Check if fragment is outside the shadow map
-    if (projCoords.z > 1.0)
+    // Check if fragment is outside the shadow map (no shadow outside coverage)
+    if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0)
         return 0.0;
 
     // Calculate bias based on surface angle
@@ -255,12 +266,12 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 
     // PCF with Poisson sampling for soft shadows
     float shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    vec2 texelSize = 1.0 / textureSize(light.shadowMap, 0);
 
     for (int i = 0; i < 4; i++)
     {
         vec2 offset = poissonDisk[i] * texelSize * 2.0;
-        shadow += texture(shadowMap, vec3(projCoords.xy + offset, currentDepth));
+        shadow += texture(light.shadowMap, vec3(projCoords.xy + offset, currentDepth));
     }
     shadow /= 4.0;
 
@@ -328,7 +339,7 @@ float SpotShadowCalculation(SpotLight light, vec3 fragPos, vec3 normal, vec3 lig
 
 // ================= LIGHT CALCULATIONS =================
 
-vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, float shadow)
+vec3 CalcDirLight(DirLightComponent light, vec3 normal, vec3 fragPos, vec3 viewDir)
 {
     vec3 lightDir = normalize(-light.direction);
 
@@ -344,8 +355,10 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir, float shadow)
     vec3 diffuse  = light.diffuse  * diff * diffuseColor;
     vec3 specular = light.specular * spec * specularColor;
 
-    // Apply shadow to diffuse and specular (ambient is not affected)
+    // Calculate shadow for this directional light
+    float shadow = DirShadowCalculation(light, fragPos, normal, lightDir);
     float visibility = 1.0 - shadow;
+
     return ambient + visibility * (diffuse + specular);
 }
 

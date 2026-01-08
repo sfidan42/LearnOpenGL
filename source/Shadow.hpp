@@ -5,35 +5,39 @@
 
 using namespace glm;
 
-class ShadowMap
+// Shadow map for a single point light (cubemap for omnidirectional shadows)
+class PointLightShadowMap
 {
 public:
-	explicit ShadowMap(unsigned int width = 2048, unsigned int height = 2048);
-	~ShadowMap();
+	explicit PointLightShadowMap(unsigned int size = 1024);
+	~PointLightShadowMap();
 
 	// Non-copyable
-	ShadowMap(const ShadowMap&) = delete;
-	ShadowMap& operator=(const ShadowMap&) = delete;
+	PointLightShadowMap(const PointLightShadowMap&) = delete;
+	PointLightShadowMap& operator=(const PointLightShadowMap&) = delete;
 
-	// Bind framebuffer for shadow pass
+	// Move semantics
+	PointLightShadowMap(PointLightShadowMap&& other) noexcept;
+	PointLightShadowMap& operator=(PointLightShadowMap&& other) noexcept;
+
 	void bindForWriting() const;
-
-	// Bind shadow map texture for reading in main shader
 	void bindForReading(GLenum textureUnit) const;
 
-	// Get light space matrix for directional light
-	static mat4 getLightSpaceMatrix(const vec3& lightDir, float orthoSize = 20.0f, float nearPlane = 1.0f,
-									float farPlane = 50.0f);
+	// Get the 6 view matrices for rendering to each cubemap face
+	static std::array<mat4, 6> getLightViewMatrices(const vec3& lightPos);
 
-	[[nodiscard]] unsigned int getWidth() const { return shadowWidth; }
-	[[nodiscard]] unsigned int getHeight() const { return shadowHeight; }
-	[[nodiscard]] GLuint getDepthTexture() const { return depthTexture; }
+	// Get projection matrix for point light (90 degree FOV)
+	static mat4 getLightProjectionMatrix(float nearPlane = 0.1f, float farPlane = 50.0f);
+
+	[[nodiscard]] GLuint getDepthCubemap() const { return depthCubemap; }
+	[[nodiscard]] unsigned int getSize() const { return shadowSize; }
+
+	static constexpr float FAR_PLANE = 50.0f;
 
 private:
 	GLuint depthMapFBO = 0;
-	GLuint depthTexture = 0;
-	uint32_t shadowWidth;
-	uint32_t shadowHeight;
+	GLuint depthCubemap = 0;
+	unsigned int shadowSize;
 };
 
 // Shadow map for a single spot light (perspective 2D depth map)
@@ -69,37 +73,33 @@ private:
 	unsigned int shadowHeight;
 };
 
-// Shadow map for a single point light (cubemap for omnidirectional shadows)
-class PointLightShadowMap
+class DirLightShadowMap
 {
 public:
-	explicit PointLightShadowMap(unsigned int size = 1024);
-	~PointLightShadowMap();
+	explicit DirLightShadowMap(unsigned int width = 2048, unsigned int height = 2048);
+	~DirLightShadowMap();
 
 	// Non-copyable
-	PointLightShadowMap(const PointLightShadowMap&) = delete;
-	PointLightShadowMap& operator=(const PointLightShadowMap&) = delete;
+	DirLightShadowMap(const DirLightShadowMap&) = delete;
+	DirLightShadowMap& operator=(const DirLightShadowMap&) = delete;
 
-	// Move semantics
-	PointLightShadowMap(PointLightShadowMap&& other) noexcept;
-	PointLightShadowMap& operator=(PointLightShadowMap&& other) noexcept;
-
+	// Bind framebuffer for shadow pass
 	void bindForWriting() const;
+
+	// Bind shadow map texture for reading in main shader
 	void bindForReading(GLenum textureUnit) const;
 
-	// Get the 6 view matrices for rendering to each cubemap face
-	static std::array<mat4, 6> getLightViewMatrices(const vec3& lightPos);
+	// Get light space matrix for directional light
+	static mat4 getLightSpaceMatrix(const vec3& lightDir, float orthoSize = 20.0f, float nearPlane = 1.0f,
+									float farPlane = 50.0f);
 
-	// Get projection matrix for point light (90 degree FOV)
-	static mat4 getLightProjectionMatrix(float nearPlane = 0.1f, float farPlane = 50.0f);
-
-	[[nodiscard]] GLuint getDepthCubemap() const { return depthCubemap; }
-	[[nodiscard]] unsigned int getSize() const { return shadowSize; }
-
-	static constexpr float FAR_PLANE = 50.0f;
+	[[nodiscard]] unsigned int getWidth() const { return shadowWidth; }
+	[[nodiscard]] unsigned int getHeight() const { return shadowHeight; }
+	[[nodiscard]] GLuint getDepthTexture() const { return depthTexture; }
 
 private:
 	GLuint depthMapFBO = 0;
-	GLuint depthCubemap = 0;
-	unsigned int shadowSize;
+	GLuint depthTexture = 0;
+	uint32_t shadowWidth;
+	uint32_t shadowHeight;
 };
