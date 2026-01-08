@@ -264,16 +264,18 @@ float DirShadowCalculation(DirLightComponent light, vec3 fragPos, vec3 normal, v
 
     float currentDepth = projCoords.z - bias;
 
-    // PCF with Poisson sampling for soft shadows
+    // PCF with more samples and smaller radius for sharper, less pixelated shadows
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(light.shadowMap, 0);
 
-    for (int i = 0; i < 4; i++)
+    // Use all 16 Poisson disk samples with a smaller multiplier for finer shadows
+    float maxSamples = 4.0;
+    for (int i = 0; i < maxSamples; i++)
     {
-        vec2 offset = poissonDisk[i] * texelSize * 2.0;
+        vec2 offset = poissonDisk[i] * texelSize * 1.0;
         shadow += texture(light.shadowMap, vec3(projCoords.xy + offset, currentDepth));
     }
-    shadow /= 4.0;
+    shadow /= maxSamples;
 
     // Return shadow factor (0 = fully shadowed, 1 = fully lit)
     return 1.0 - shadow;

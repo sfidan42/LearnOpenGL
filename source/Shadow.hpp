@@ -40,7 +40,7 @@ private:
 	unsigned int shadowSize;
 };
 
-// Shadow map for a single spot light (perspective 2D depth map)
+// Shadow map for a single spotlight (perspective 2D depth map)
 class SpotlightShadowMap
 {
 public:
@@ -58,7 +58,7 @@ public:
 	void bindForWriting() const;
 	void bindForReading(GLenum textureUnit) const;
 
-	// Calculate light space matrix for spot light
+	// Calculate light space matrix for spotlight
 	[[nodiscard]] mat4 getLightSpaceMatrix(const vec3& position, const vec3& direction,
 										   float outerCutOff, float nearPlane = 0.1f, float farPlane = 50.0f) const;
 
