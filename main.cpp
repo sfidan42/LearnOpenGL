@@ -29,7 +29,7 @@ static void setupScene(Renderer& renderer, Data& inGameData)
 	inGameData.pointLights.reserve(4);
 	inGameData.spotlights.reserve(4);
 	inGameData.dirLights.reserve(1);
-	inGameData.modelInstances.reserve(32);
+	inGameData.modelInstances.reserve(16);
 
 	entt::entity aux;
 
@@ -56,21 +56,19 @@ static void setupScene(Renderer& renderer, Data& inGameData)
 		backpackTransforms[i].rotation = eulerAngles(q);
 	}
 
-	const vector tilesTransforms = {
-		TransformComponent{vec3(0.0f, -1.0f, 0.0f), vec3(0.0f), vec3(0.5f)}
-	};
-
 	for(const TransformComponent& transform : backpackTransforms)
 	{
 		aux = renderer.loadModel("backpack/backpack.obj", transform);
 		inGameData.modelInstances.push_back(aux);
 	}
 
-	for(const TransformComponent& transform : tilesTransforms)
-	{
-		aux = renderer.loadModel("interior_tiles_1k.glb", transform);
-		inGameData.modelInstances.push_back(aux);
-	}
+	TransformComponent tileTransform{
+		vec3(0.0f, -1.0f, 0.0f),
+		vec3(0.0f),
+		vec3(0.5f)
+	};
+	aux = renderer.loadModel("interior_tiles_1k.glb", tileTransform);
+	inGameData.modelInstances.push_back(aux);
 
 	LightManager& lightManager = renderer.getLightManager();
 
@@ -124,7 +122,7 @@ static void setupScene(Renderer& renderer, Data& inGameData)
 	aux = renderer.loadModel("Cardboard_Box.fbx", boxTransform);
 	inGameData.modelInstances.push_back(aux);
 
-	cout << "Scene setup complete." << endl;
+	cout << "\n============= Scene setup complete. =============" << endl;
 	cout << "Number of model instances: " << inGameData.modelInstances.size() << endl;
 	cout << "Number of point lights: " << inGameData.pointLights.size() << endl;
 	cout << "Number of spotlights: " << inGameData.spotlights.size() << endl;
@@ -141,7 +139,7 @@ static void updateScene(Renderer& renderer, const Data& gameData, const float de
 		sunAngle -= 360.0f;
 	const vec3 sunDirection = normalize(vec3(cos(radians(sunAngle)), -1.0f, sin(radians(sunAngle))));
 
-	entt::entity aux = gameData.dirLights[0];
+	const entt::entity aux = gameData.dirLights[0];
 	DirLightComponent& dirLight = lightManager.getDirLight(aux);
 	dirLight.direction = sunDirection;
 	lightManager.updateDirLight(aux);

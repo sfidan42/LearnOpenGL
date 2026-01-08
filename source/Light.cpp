@@ -96,22 +96,23 @@ entt::entity LightManager::createDirLight(const vec3& direction, const vec3& col
 
 PointLightComponent& LightManager::getPointLight(const entt::entity entity)
 {
+	assert(lightRegistry.all_of<PointLightComponent>(entity) && "Entity does not have PointLightComponent");
 	return lightRegistry.get<PointLightComponent>(entity);
 }
 
 SpotlightComponent& LightManager::getSpotlight(const entt::entity entity)
 {
+	assert(lightRegistry.all_of<SpotlightComponent>(entity) && "Entity does not have SpotlightComponent");
 	return lightRegistry.get<SpotlightComponent>(entity);
 }
 
 DirLightComponent& LightManager::getDirLight(const entt::entity entity)
 {
 	assert(lightRegistry.all_of<DirLightComponent>(entity) && "Entity does not have DirLightComponent");
-	assert(lightRegistry.valid(entity) && "Invalid entity passed to getDirLight");
 	return lightRegistry.get<DirLightComponent>(entity);
 }
 
-void LightManager::updatePointLight(const entt::entity /*light*/)
+void LightManager::updatePointLight(const entt::entity /*lightEntity*/)
 {
 	syncPointLights();
 }
@@ -151,14 +152,14 @@ void LightManager::deleteDirLight(const entt::entity lightEntity)
 
 void LightManager::recalcSpotlightMatrix(const entt::entity entity)
 {
-	const auto& [sLight, shadow] = lightRegistry.try_get<SpotlightComponent, SpotlightShadowMap>(entity);
+	const auto& [sLight, shadow]
+		= lightRegistry.try_get<SpotlightComponent, SpotlightShadowMap>(entity);
 	if(!sLight || !shadow)
 		return;
+
 	sLight->lightSpaceMatrix = shadow->getLightSpaceMatrix(
-		sLight->position,
-		normalize(sLight->direction),
-		sLight->outerCutOff,
-		0.1f, 50.0f
+		sLight->position, normalize(sLight->direction),
+		sLight->outerCutOff, 0.1f, 50.0f
 	);
 }
 
@@ -167,7 +168,7 @@ void LightManager::recalcDirLightMatrix(const entt::entity entity)
 	const auto& [dirLight, shadow] = lightRegistry.try_get<DirLightComponent, DirLightShadowMap>(entity);
 	if(!dirLight || !shadow)
 		return;
-	dirLight->lightSpaceMatrix = DirLightShadowMap::getLightSpaceMatrix(
+	dirLight->lightSpaceMatrix = shadow->getLightSpaceMatrix(
 		dirLight->direction,
 		50.0f, // ortho size - covers -50 to +50 on X/Y in light space
 		0.1f, // near plane
