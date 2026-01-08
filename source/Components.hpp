@@ -85,3 +85,26 @@ struct DirLightComponent
 	uint64_t shadowMapHandle; // Bindless 2D shadow map handle (8 bytes)
 	float _pad4[2] = { 0.0f, 0.0f }; // Padding to 16-byte alignment
 }; // Total 144 bytes
+
+struct PointShadowMapComponent
+{
+	GLuint frameBuffer;
+	GLuint depthCubeMap;
+	uint32_t shadowSize;
+};
+
+struct SpotShadowMapComponent
+{
+	GLuint frameBuffer;
+	GLuint depthTexture;
+	uint32_t shadowWidth;
+	uint32_t shadowHeight;
+};
+
+struct DirShadowMapComponent
+{
+	GLuint frameBuffer;
+	GLuint depthTexture;
+	uint32_t shadowWidth;
+	uint32_t shadowHeight;
+};
