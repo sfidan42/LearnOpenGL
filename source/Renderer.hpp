@@ -24,6 +24,7 @@ private:
 	void initOpenGL();
 	void initShaders();
 	void loadSkybox();
+	void initCamera();
 	void initLightManager();
 
 	void renderScene(const DrawModelsCallback& drawModels) const;
@@ -50,14 +51,12 @@ private:
 	};
 
 	vector<Shader> shaders;
+	entt::registry modelRegistry;
 
-	Camera camera;
-
+	Camera* camera = nullptr;
 	Skybox* skybox = nullptr;
 
 	LightManager* lightManager = nullptr;
-
-	entt::registry modelRegistry;
 
 	bool isFocused = false;
 };

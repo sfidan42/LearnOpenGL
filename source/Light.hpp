@@ -14,7 +14,7 @@ using DrawModelsCallback = std::function<void(const Shader&)>;
 class LightManager
 {
 public:
-	LightManager(const Shader& mainShader, const Shader& skyShader, const Shader& shadowMapShader);
+	LightManager(const Shader& mainShader, const Shader& skyShader, const Shader& shadowMapShader, const Shader& shadowPointShader);
 	~LightManager();
 
 	entt::entity createPointLight(const vec3& position, const vec3& color);
@@ -46,6 +46,7 @@ private:
 	const Shader& cachedMainShader;
 	const Shader& cachedSkyShader;
 	const Shader& cachedShadowMapShader;
+	const Shader& cachedShadowPointShader;
 
 	void recalcPointLightMatrices(entt::entity lightEntity);
 	void recalcSpotlightMatrix(entt::entity entityEntity);

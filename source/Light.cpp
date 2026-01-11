@@ -3,8 +3,8 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 
-LightManager::LightManager(const Shader& mainShader, const Shader& skyShader, const Shader& shadowMapShader)
-: cachedMainShader(mainShader), cachedSkyShader(skyShader), cachedShadowMapShader(shadowMapShader)
+LightManager::LightManager(const Shader& mainShader, const Shader& skyShader, const Shader& shadowMapShader, const Shader& shadowPointShader)
+: cachedMainShader(mainShader), cachedSkyShader(skyShader), cachedShadowMapShader(shadowMapShader), cachedShadowPointShader(shadowPointShader)
 {
 	// Create SSBOs for dynamic lights
 	glGenBuffers(1, &pointLightSSBO);
@@ -580,8 +580,8 @@ void LightManager::renderPointLightShadows(const DrawModelsCallback& drawModels)
 
 	glCullFace(GL_BACK);
 
-	cachedShadowMapShader.use();
-	cachedShadowMapShader.setFloat("farPlane", POINT_LIGHT_FAR_PLANE);
+	cachedShadowPointShader.use();
+	cachedShadowPointShader.setFloat("farPlane", POINT_LIGHT_FAR_PLANE);
 
 	auto view = lightRegistry.view<PointLightComponent, PointShadowMapComponent>();
 	for(auto [entity, light, shadowComp] : view.each())
@@ -590,15 +590,15 @@ void LightManager::renderPointLightShadows(const DrawModelsCallback& drawModels)
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowComp.frameBuffer);
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		cachedShadowMapShader.setVec3("lightPos", light.position);
+		cachedShadowPointShader.setVec3("lightPos", light.position);
 
 		for(int face = 0; face < 6; ++face)
 		{
 			string uniformName = "shadowMatrices[" + std::to_string(face) + "]";
-			cachedShadowMapShader.setMat4(uniformName, light.shadowMatrices[face]);
+			cachedShadowPointShader.setMat4(uniformName, light.shadowMatrices[face]);
 		}
 
-		drawModels(cachedShadowMapShader);
+		drawModels(cachedShadowPointShader);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);

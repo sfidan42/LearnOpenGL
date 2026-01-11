@@ -2,6 +2,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/constants.hpp>
 
+Camera::Camera(const Shader& mainShader, const Shader& skyShader)
+: cachedMainShader(mainShader), cachedSkyShader(skyShader)
+{}
+
 void Camera::setAspect(const float width, const float height)
 {
 	aspect = width / height;
@@ -31,17 +35,19 @@ void Camera::update(const float deltaTime)
 	target = eye + front;
 }
 
-void Camera::send(const Shader& mainShader, const Shader& skyShader) const
+void Camera::sync() const
 {
-	mainShader.use();
 	const mat4 proj = getProj();
 	const mat4 view = getView();
-	mainShader.setMat4("projection", proj);
-	mainShader.setMat4("view", view);
-	mainShader.setVec3("viewPos", eye);
-	skyShader.use();
-	skyShader.setMat4("projection", proj);
-	skyShader.setMat4("view", mat4(mat3(view))); // Remove translation
+
+	cachedMainShader.use();
+	cachedMainShader.setMat4("projection", proj);
+	cachedMainShader.setMat4("view", view);
+	cachedMainShader.setVec3("viewPos", eye);
+
+	cachedSkyShader.use();
+	cachedSkyShader.setMat4("projection", proj);
+	cachedSkyShader.setMat4("view", mat4(mat3(view))); // Remove translation
 }
 
 mat4 Camera::getView() const

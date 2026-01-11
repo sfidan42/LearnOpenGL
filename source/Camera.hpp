@@ -7,6 +7,8 @@ using namespace glm;
 class Camera
 {
 public:
+	Camera(const Shader& mainShader, const Shader& skyShader);
+
 	vec3 speed{0.0f, 0.0f, 0.0f};
 
 	void setAspect(float width, float height);
@@ -14,7 +16,7 @@ public:
 	void mouse(float xoffset, float yoffset);
 	void update(float deltaTime);
 
-	void send(const Shader& mainShader, const Shader& skyShader) const;
+	void sync() const;
 
 private:
 	[[nodiscard]] mat4 getView() const;
@@ -35,4 +37,8 @@ private:
 	float yaw{-90.0f};
 	float pitch{0.0f};
 	float sensitivity{0.2f};
+
+	// cached shaders
+	const Shader& cachedMainShader;
+	const Shader& cachedSkyShader;
 };

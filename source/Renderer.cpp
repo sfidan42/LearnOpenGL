@@ -11,6 +11,7 @@ Renderer::~Renderer()
 	modelRegistry.clear();
 	shaders.clear();
 	delete lightManager;
+	delete camera;
 	delete skybox;
 	if(glContext)
 		SDL_GL_DestroyContext(glContext);
@@ -24,6 +25,7 @@ void Renderer::init(SDL_Window* sdlWindow)
 	initOpenGL();
 	initShaders();
 	loadSkybox();
+	initCamera();
 	initLightManager();
 
 	setupInstanceTracking(modelRegistry);
@@ -39,7 +41,8 @@ void Renderer::event(const SDL_Event& event)
 			windowWidth = event.window.data1;
 			windowHeight = event.window.data2;
 			glViewport(0, 0, windowWidth, windowHeight);
-			camera.setAspect(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
+			if(camera)
+				camera->setAspect(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
 			break;
 
 		case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -68,16 +71,16 @@ void Renderer::event(const SDL_Event& event)
 						}
 						break;
 					case SDL_SCANCODE_W:
-						if(isFocused) camera.speed.z += 1.0f;
+						if(isFocused) if(camera) camera->speed.z += 1.0f;
 						break;
 					case SDL_SCANCODE_S:
-						if(isFocused) camera.speed.z -= 1.0f;
+						if(isFocused) if(camera) camera->speed.z -= 1.0f;
 						break;
 					case SDL_SCANCODE_A:
-						if(isFocused) camera.speed.x -= 1.0f;
+						if(isFocused) if(camera) camera->speed.x -= 1.0f;
 						break;
 					case SDL_SCANCODE_D:
-						if(isFocused) camera.speed.x += 1.0f;
+						if(isFocused) if(camera) camera->speed.x += 1.0f;
 						break;
 					default: break;
 				}
@@ -89,13 +92,13 @@ void Renderer::event(const SDL_Event& event)
 			{
 				switch(event.key.scancode)
 				{
-					case SDL_SCANCODE_W: camera.speed.z -= 1.0f;
+					case SDL_SCANCODE_W: if(camera) camera->speed.z -= 1.0f;
 						break;
-					case SDL_SCANCODE_S: camera.speed.z += 1.0f;
+					case SDL_SCANCODE_S: if(camera) camera->speed.z += 1.0f;
 						break;
-					case SDL_SCANCODE_A: camera.speed.x += 1.0f;
+					case SDL_SCANCODE_A: if(camera) camera->speed.x += 1.0f;
 						break;
-					case SDL_SCANCODE_D: camera.speed.x -= 1.0f;
+					case SDL_SCANCODE_D: if(camera) camera->speed.x -= 1.0f;
 						break;
 					default: break;
 				}
@@ -106,7 +109,7 @@ void Renderer::event(const SDL_Event& event)
 			// Only process mouse motion when focused
 			if(isFocused)
 			{
-				camera.mouse(event.motion.xrel, -event.motion.yrel);
+				if(camera) camera->mouse(event.motion.xrel, -event.motion.yrel);
 			}
 			break;
 
@@ -117,7 +120,7 @@ void Renderer::event(const SDL_Event& event)
 
 void Renderer::update(const float deltaTime)
 {
-	camera.update(deltaTime);
+	camera->update(deltaTime);
 
 	auto drawModels = [this](const Shader& shader)
 	{
@@ -214,7 +217,6 @@ void Renderer::initOpenGL()
 	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 
 	glViewport(0, 0, windowWidth, windowHeight);
-	camera.setAspect(windowWidth, windowHeight);
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
@@ -252,30 +254,36 @@ void Renderer::loadSkybox()
 	skybox->scale(1000.0f);
 }
 
+void Renderer::initCamera()
+{
+	camera = new Camera(shaders[MAIN_SHADER], shaders[SKYBOX_SHADER]);
+	camera->setAspect(windowWidth, windowHeight);
+}
+
 void Renderer::initLightManager()
 {
-	lightManager = new LightManager(shaders[MAIN_SHADER], shaders[SKYBOX_SHADER], shaders[SHADOW_MAP_SHADER]);
+	lightManager = new LightManager(
+		shaders[MAIN_SHADER],
+		shaders[SKYBOX_SHADER],
+		shaders[SHADOW_MAP_SHADER],
+		shaders[SHADOW_POINT_SHADER]
+	);
 }
 
 void Renderer::renderScene(const DrawModelsCallback& drawModels) const
 {
-	// Restore viewport to window size
+	glDisable(GL_CULL_FACE);
 	glViewport(0, 0, windowWidth, windowHeight);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	const Shader& mainShader = shaders[MAIN_SHADER];
-	const Shader& skyboxShader = shaders[SKYBOX_SHADER];
+	camera->sync();
 
-	camera.send(mainShader, skyboxShader);
+	const Shader& mainShader = shaders[MAIN_SHADER];
 
 	mainShader.use();
-
-	// All shadow maps (directional, point, and spotlight) are now handled via bindless textures
-	// stored directly in the light SSBOs - no need to bind them here
-
-	// Draw all models
 	drawModels(mainShader);
-
 	skybox->draw();
+
+	glEnable(GL_CULL_FACE);
 }
