@@ -12,7 +12,7 @@ public:
 	Renderer() = default;
 	~Renderer();
 
-	bool init(SDL_Window* sdlWindow);
+	void init(SDL_Window* sdlWindow);
 	void event(const SDL_Event& event);
 	void update(float deltaTime);
 
@@ -21,6 +21,11 @@ public:
 	LightManager& getLightManager() const { return *lightManager; }
 
 private:
+	void initOpenGL();
+	void initShaders();
+	void loadSkybox();
+	void initLightManager();
+
 	void renderScene(const DrawModelsCallback& drawModels) const;
 
 	SDL_Window* window = nullptr;

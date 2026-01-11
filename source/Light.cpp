@@ -156,21 +156,26 @@ void LightManager::deleteDirLight(const entt::entity lightEntity)
 	syncDirLights();
 }
 
+void LightManager::renderShadows(const DrawModelsCallback& drawModels)
+{
+	renderDirLightShadows(drawModels);
+	renderPointLightShadows(drawModels);
+	renderSpotlightShadows(drawModels);
+}
+
 void LightManager::recalcPointLightMatrices(const entt::entity lightEntity)
 {
 	auto* pLight = lightRegistry.try_get<PointLightComponent>(lightEntity);
 	if(!pLight)
 		return;
 
-	constexpr float nearPlane = 0.1f;
+	const float nearPlane = 0.1f;
 	const float farPlane = pLight->farPlane;
 	const mat4 projection = getPointLightProjection(nearPlane, farPlane);
 	const auto viewMatrices = getPointLightViewMatrices(pLight->position);
 
 	for(int face = 0; face < 6; ++face)
-	{
 		pLight->shadowMatrices[face] = projection * viewMatrices[face];
-	}
 }
 
 void LightManager::recalcSpotlightMatrix(const entt::entity lightEntity)
@@ -180,7 +185,8 @@ void LightManager::recalcSpotlightMatrix(const entt::entity lightEntity)
 		return;
 
 	sLight->lightSpaceMatrix = getSpotLightSpaceMatrix(
-		sLight->position, normalize(sLight->direction),
+		sLight->position,
+		normalize(sLight->direction),
 		sLight->outerCutOff, 0.1f, 50.0f
 	);
 }
@@ -320,7 +326,7 @@ GLuint64 LightManager::createPointShadowMap(entt::entity lightEntity, uint32_t s
 	setupPointShadowTexture(comp);
 
 	// Create bindless handle
-	GLuint64 handle = glGetTextureHandleARB(comp.depthCubeMap);
+	const GLuint64 handle = glGetTextureHandleARB(comp.depthCubeMap);
 	glMakeTextureHandleResidentARB(handle);
 	return handle;
 }
@@ -349,7 +355,7 @@ GLuint64 LightManager::createSpotShadowMap(entt::entity lightEntity, uint32_t wi
 	comp.shadowHeight = height;
 	setupSpotShadowTexture(comp);
 
-	GLuint64 handle = glGetTextureHandleARB(comp.depthTexture);
+	const GLuint64 handle = glGetTextureHandleARB(comp.depthTexture);
 	glMakeTextureHandleResidentARB(handle);
 	return handle;
 }
@@ -378,7 +384,7 @@ GLuint64 LightManager::createDirShadowMap(entt::entity lightEntity, uint32_t wid
 	comp.shadowHeight = height;
 	setupDirShadowTexture(comp);
 
-	GLuint64 handle = glGetTextureHandleARB(comp.depthTexture);
+	const GLuint64 handle = glGetTextureHandleARB(comp.depthTexture);
 	glMakeTextureHandleResidentARB(handle);
 	return handle;
 }
@@ -412,31 +418,31 @@ std::array<mat4, 6> LightManager::getPointLightViewMatrices(const vec3& lightPos
 	};
 }
 
-mat4 LightManager::getPointLightProjection(float nearPlane, float farPlane)
+mat4 LightManager::getPointLightProjection(const float nearPlane, const float farPlane)
 {
 	return perspective(radians(90.0f), 1.0f, nearPlane, farPlane);
 }
 
 mat4 LightManager::getSpotLightSpaceMatrix(const vec3& position, const vec3& direction, float outerCutOff,
-										   float nearPlane, float farPlane)
+										   const float nearPlane, const float farPlane)
 {
 	float fov = acos(outerCutOff) * 2.0f;
 	fov = glm::clamp(fov, glm::radians(10.0f), glm::radians(170.0f));
 
-	mat4 projection = perspective(fov, 1.0f, nearPlane, farPlane);
+	const mat4 projection = perspective(fov, 1.0f, nearPlane, farPlane);
 
 	// Handle case where direction is parallel to the default up vector
-	vec3 normalizedDir = normalize(direction);
+	const vec3 normalizedDir = normalize(direction);
 	vec3 up = vec3(0.0f, 1.0f, 0.0f);
 	if(abs(dot(normalizedDir, up)) > 0.99f)
 		up = vec3(1.0f, 0.0f, 0.0f); // Use X-axis as up when light points straight up/down
 
-	mat4 view = lookAt(position, position + normalizedDir, up);
+	const mat4 view = lookAt(position, position + normalizedDir, up);
 
 	return projection * view;
 }
 
-mat4 LightManager::getDirLightSpaceMatrix(const vec3& lightDir, float orthoSize, float nearPlane, float farPlane)
+mat4 LightManager::getDirLightSpaceMatrix(const vec3& lightDir, const float orthoSize, const float nearPlane, const float farPlane)
 {
 	const mat4 lightProjection = ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
 	const mat4 lightView = lookAt(-normalize(lightDir) * 25.0f, vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
@@ -518,7 +524,7 @@ void LightManager::setupDirShadowTexture(DirShadowMapComponent& comp)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
-	float borderColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
+	const float borderColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
 	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
 	// Enable anisotropic filtering for better quality
@@ -573,8 +579,6 @@ void LightManager::renderPointLightShadows(const DrawModelsCallback& drawModels)
 		return;
 
 	glCullFace(GL_BACK);
-	glEnable(GL_POLYGON_OFFSET_FILL);
-	glPolygonOffset(2.0f, 4.0f);
 
 	cachedShadowMapShader.use();
 	cachedShadowMapShader.setFloat("farPlane", POINT_LIGHT_FAR_PLANE);
@@ -597,7 +601,6 @@ void LightManager::renderPointLightShadows(const DrawModelsCallback& drawModels)
 		drawModels(cachedShadowMapShader);
 	}
 
-	glDisable(GL_POLYGON_OFFSET_FILL);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -607,8 +610,6 @@ void LightManager::renderSpotlightShadows(const DrawModelsCallback& drawModels)
 		return;
 
 	glCullFace(GL_BACK);
-	glEnable(GL_POLYGON_OFFSET_FILL);
-	glPolygonOffset(4.0f, 8.0f);
 
 	cachedShadowMapShader.use();
 
@@ -623,6 +624,5 @@ void LightManager::renderSpotlightShadows(const DrawModelsCallback& drawModels)
 		drawModels(cachedShadowMapShader);
 	}
 
-	glDisable(GL_POLYGON_OFFSET_FILL);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

@@ -17,94 +17,17 @@ Renderer::~Renderer()
 	// Note: SDL_Window is owned by AppState in main.cpp, not by Renderer
 }
 
-bool Renderer::init(SDL_Window* sdlWindow)
+void Renderer::init(SDL_Window* sdlWindow)
 {
 	window = sdlWindow;
 
-	// Set OpenGL attributes before creating context
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); // MSAA
-
-	glContext = SDL_GL_CreateContext(window);
-	if(!glContext)
-	{
-		cout << "Failed to create OpenGL context: " << SDL_GetError() << endl;
-		return false;
-	}
-
-	SDL_GL_MakeCurrent(window, glContext);
-	// Mouse capture is now controlled by focus mode (double-click to focus)
-
-	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(SDL_GL_GetProcAddress)))
-	{
-		cout << "Failed to initialize GLAD" << endl;
-		return false;
-	}
-
-	const GLubyte* vendor = glGetString(GL_VENDOR);
-	const GLubyte* renderer = glGetString(GL_RENDERER);
-	const GLubyte* version = glGetString(GL_VERSION);
-	const GLubyte* sl = glGetString(GL_SHADING_LANGUAGE_VERSION);
-
-	std::cout << "OpenGL Vendor   : " << vendor << '\n';
-	std::cout << "OpenGL Renderer : " << renderer << '\n';
-	std::cout << "OpenGL Version  : " << version << '\n';
-	std::cout << "GLSL Version    : " << sl << '\n';
-
-	if(!GLAD_GL_ARB_bindless_texture)
-	{
-		cout << "Bindless textures not supported by the GPU/driver" << endl;
-		return false;
-	}
-
-	// Get window size
-	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-
-	glEnable(GL_DEPTH_TEST);
-	glViewport(0, 0, windowWidth, windowHeight);
-	camera.setAspect(windowWidth, windowHeight);
-
-	glEnable(GL_CULL_FACE);
-
-	// My redundant MSAA enable call
-	glEnable(GL_MULTISAMPLE);
-
-	for(int type = 0; type < NUM_SHADERS; ++type)
-	{
-		cout << "Loading shader: " << shaderFiles[type] << endl;
-		shaders.emplace_back(shaderFiles[type]);
-		if(!shaders[type].ok())
-		{
-			cout << "Failed to load shader: " << shaderFiles[type] << endl;
-			return false;
-		}
-	}
-
-	skybox = new Skybox(shaders[SKYBOX_SHADER]);
-
-	const string faces[6] = {
-		"right.jpg",
-		"left.jpg",
-		"top.jpg",
-		"bottom.jpg",
-		"front.jpg",
-		"back.jpg"
-	};
-
-	const string skyboxDir = string(DATA_DIR) + "/textures/skybox";
-	skybox->loadFaces(skyboxDir, faces);
-	skybox->scale(1000.0f);
-
-	stbi_set_flip_vertically_on_load(true);
+	initOpenGL();
+	initShaders();
+	loadSkybox();
+	initLightManager();
 
 	setupInstanceTracking(modelRegistry);
-
-	lightManager = new LightManager(shaders[MAIN_SHADER], shaders[SKYBOX_SHADER], shaders[SHADOW_MAP_SHADER]);
-
-	return true;
+	stbi_set_flip_vertically_on_load(true);
 }
 
 void Renderer::event(const SDL_Event& event)
@@ -206,10 +129,7 @@ void Renderer::update(const float deltaTime)
 	};
 
 	// ========== PASS 1: Shadow Maps ==========
-
-	lightManager->renderDirLightShadows(drawModels);
-	lightManager->renderPointLightShadows(drawModels);
-	lightManager->renderSpotlightShadows(drawModels);
+	lightManager->renderShadows(drawModels);
 
 	// ========== PASS 2: Main Scene ==========
 	renderScene(drawModels);
@@ -258,6 +178,83 @@ entt::entity Renderer::loadModel(const string& modelPath, const TransformCompone
 	modelComp.instanceMatrices.emplace_back(transform.bake());
 
 	return instance;
+}
+
+void Renderer::initOpenGL()
+{
+	// Set OpenGL attributes before creating context
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); // MSAA
+
+	glContext = SDL_GL_CreateContext(window);
+	if(!glContext)
+		throw std::runtime_error("Failed to create OpenGL context: " + string(SDL_GetError()));
+
+	SDL_GL_MakeCurrent(window, glContext);
+
+	if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(SDL_GL_GetProcAddress)))
+		throw std::runtime_error("Failed to initialize GLAD");
+
+	const GLubyte* vendor = glGetString(GL_VENDOR);
+	const GLubyte* renderer = glGetString(GL_RENDERER);
+	const GLubyte* version = glGetString(GL_VERSION);
+	const GLubyte* sl = glGetString(GL_SHADING_LANGUAGE_VERSION);
+
+	std::cout << "OpenGL Vendor   : " << vendor << '\n';
+	std::cout << "OpenGL Renderer : " << renderer << '\n';
+	std::cout << "OpenGL Version  : " << version << '\n';
+	std::cout << "GLSL Version    : " << sl << '\n';
+
+	if(!GLAD_GL_ARB_bindless_texture)
+		throw std::runtime_error("Bindless textures not supported by the OpenGL driver");
+
+	SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+
+	glViewport(0, 0, windowWidth, windowHeight);
+	camera.setAspect(windowWidth, windowHeight);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_MULTISAMPLE);
+}
+
+void Renderer::initShaders()
+{
+	shaders.clear();
+	shaders.reserve(NUM_SHADERS);
+	for(int type = 0; type < NUM_SHADERS; ++type)
+	{
+		cout << "Loading shader: " << shaderFiles[type] << endl;
+		shaders.emplace_back(shaderFiles[type]);
+		if(!shaders[type].ok())
+			throw std::runtime_error("Failed to load shader: " + shaderFiles[type]);
+	}
+}
+
+void Renderer::loadSkybox()
+{
+	skybox = new Skybox(shaders[SKYBOX_SHADER]);
+
+	const string faces[6] = {
+		"right.jpg",
+		"left.jpg",
+		"top.jpg",
+		"bottom.jpg",
+		"front.jpg",
+		"back.jpg"
+	};
+
+	const string skyboxDir = string(DATA_DIR) + "/textures/skybox";
+	skybox->loadFaces(skyboxDir, faces);
+	skybox->scale(1000.0f);
+}
+
+void Renderer::initLightManager()
+{
+	lightManager = new LightManager(shaders[MAIN_SHADER], shaders[SKYBOX_SHADER], shaders[SHADOW_MAP_SHADER]);
 }
 
 void Renderer::renderScene(const DrawModelsCallback& drawModels) const

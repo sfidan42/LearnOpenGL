@@ -72,12 +72,13 @@ static void setupScene(Renderer& renderer, Data& inGameData)
 
 	LightManager& lightManager = renderer.getLightManager();
 
+	/*
 	// Create directional light (sun)
 	aux = lightManager.createDirLight(
 		normalize(vec3(-0.1f, -1.0f, -0.3f)), // direction
 		vec3(1.0f, 1.0f, 0.9f) // warm sunlight color
 	);
-	inGameData.dirLights.push_back(aux);
+	inGameData.dirLights.push_back(aux);*/
 
 	aux = lightManager.createPointLight(
 		vec3(8.0f, 1.0f, 8.0f), // position
@@ -131,7 +132,9 @@ static void setupScene(Renderer& renderer, Data& inGameData)
 
 static void updateScene(Renderer& renderer, const Data& gameData, const float deltaTime)
 {
+	/*
 	LightManager& lightManager = renderer.getLightManager();
+
 	// Animate directional light (sun) over time
 	static float sunAngle = 0.0f; // in degrees
 	sunAngle += 10.0f * deltaTime; // degrees per second
@@ -143,6 +146,7 @@ static void updateScene(Renderer& renderer, const Data& gameData, const float de
 	DirLightComponent& dirLight = lightManager.getDirLight(aux);
 	dirLight.direction = sunDirection;
 	lightManager.updateDirLight(aux);
+	*/
 
 	renderer.update(deltaTime);
 }
@@ -171,9 +175,13 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 
 	SDL_SetWindowMinimumSize(state->window, 400, 300);
 
-	if(!state->renderer.init(state->window))
+	try
 	{
-		SDL_Log("Failed to initialize renderer");
+		state->renderer.init(state->window);
+	}
+	catch(const std::exception& e)
+	{
+		SDL_Log("Renderer initialization error: %s", e.what());
 		SDL_DestroyWindow(state->window);
 		delete state;
 		return SDL_APP_FAILURE;

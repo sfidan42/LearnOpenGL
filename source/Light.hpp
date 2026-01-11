@@ -33,10 +33,8 @@ public:
 	void deleteSpotlight(entt::entity lightEntity);
 	void deleteDirLight(entt::entity lightEntity);
 
-	// Shadow rendering - takes shaders and a callback to draw models
-	void renderDirLightShadows(const DrawModelsCallback& drawModels);
-	void renderPointLightShadows(const DrawModelsCallback& drawModels);
-	void renderSpotlightShadows(const DrawModelsCallback& drawModels);
+	// Shadow rendering - takes a callback to draw models
+	void renderShadows(const DrawModelsCallback& drawModels);
 
 private:
 	entt::registry lightRegistry;
@@ -89,6 +87,11 @@ private:
 	static void setupPointShadowTexture(PointShadowMapComponent& comp);
 	static void setupSpotShadowTexture(SpotShadowMapComponent& comp);
 	static void setupDirShadowTexture(DirShadowMapComponent& comp);
+
+	// Shadow rendering implementations
+	void renderDirLightShadows(const DrawModelsCallback& drawModels);
+	void renderPointLightShadows(const DrawModelsCallback& drawModels);
+	void renderSpotlightShadows(const DrawModelsCallback& drawModels);
 };
 
 void setupLightTracking(LightManager& lManager, entt::registry& registry, const Shader& mainShader);
