@@ -40,54 +40,65 @@ struct ModelComponent
 
 	void drawInstanced(const Shader& shader) const;
 };
-
 struct PointLightComponent
 {
 	vec3 position;
-	float constant; // Row 1: 16 bytes
+	float constant;
+    
 	vec3 ambient;
-	float linear; // Row 2: 16 bytes
+	float linear;
+    
 	vec3 diffuse;
-	float quadratic; // Row 3: 16 bytes
+	float quadratic;
+    
 	vec3 specular;
-	float farPlane; // Row 4: 16 bytes - far plane for shadow calculation
-	std::array<mat4, 6> shadowMatrices; // Cached projection * view matrices for 6 faces
-	uint64_t cubeMapHandle; // Bindless cube map handle (8 bytes)
-	float _pad[3] = { 0.0f, 0.0f, 0.0f }; // Padding to 16-byte alignment
+	float farPlane;
+    
+	std::array<mat4, 6> shadowMatrices;
+	GLuint64 cubeMapHandle; // Bindless handle to samplerCube
+	float _pad[3];
 };
 
 struct SpotlightComponent
 {
 	vec3 position;
-	float cutOff; // Row 1: 16 bytes
+	float cutOff;
+    
 	vec3 direction;
-	float outerCutOff; // Row 2: 16 bytes
+	float outerCutOff;
+    
 	vec3 ambient;
-	float constant; // Row 3: 16 bytes
+	float constant;
+    
 	vec3 diffuse;
-	float linear; // Row 4: 16 bytes
+	float linear;
+    
 	vec3 specular;
-	float quadratic; // Row 5: 16 bytes
-	mat4 lightSpaceMatrix; // Rows 6-9: 64 bytes
-	uint64_t shadowMapHandle; // Bindless 2D shadow map handle (8 bytes)
-	float _pad[2] = { 0.0f, 0.0f }; // Padding to 16-byte alignment
-}; // Total 160 bytes
+	float quadratic;
+    
+	mat4 lightSpaceMatrix;
+	GLuint64 shadowMapHandle; // Bindless handle to sampler2DShadow
+	float _pad[2];
+};
 
 struct DirLightComponent
 {
 	vec3 direction;
-	float _pad0 = 0.0f; // Row 1: 16 bytes
+	float _pad0;
+    
 	vec3 ambient;
-	float _pad1 = 0.0f; // Row 2: 16 bytes
+	float _pad1;
+    
 	vec3 diffuse;
-	float _pad2 = 0.0f; // Row 3: 16 bytes
+	float _pad2;
+    
 	vec3 specular;
-	float _pad3 = 0.0f; // Row 4: 16 bytes
-	mat4 lightSpaceMatrix; // Rows 5-8: 64 bytes
-	uint64_t shadowMapHandle; // Bindless 2D shadow map handle (8 bytes)
-	float _pad4[2] = { 0.0f, 0.0f }; // Padding to 16-byte alignment
-}; // Total 144 bytes
-
+	float _pad3;
+    
+	mat4 lightSpaceMatrix;
+	GLuint64 shadowMapHandle; // Bindless handle to sampler2DShadow
+	float _pad4[2];
+};
 struct PointShadowMapComponent
 {
 	GLuint frameBuffer;

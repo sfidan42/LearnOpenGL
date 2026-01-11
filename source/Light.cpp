@@ -55,7 +55,7 @@ entt::entity LightManager::createSpotlight(const vec3& position, const vec3& dir
 	lightComp.cutOff = cos(radians(12.5f));
 	lightComp.direction = direction;
 	lightComp.outerCutOff = cos(radians(17.5f));
-	lightComp.ambient = color * 0.1f;
+	lightComp.ambient = vec3(0.0f);
 	lightComp.constant = 1.0f;
 	lightComp.diffuse = color;
 	lightComp.linear = 0.09f;
@@ -68,7 +68,7 @@ entt::entity LightManager::createSpotlight(const vec3& position, const vec3& dir
 	auto& comp = lightRegistry.emplace<SpotlightComponent>(lightEnt, lightComp);
 
 	// Create shadow map for this light using ShadowManager
-	comp.shadowMapHandle = createSpotShadowMap(lightEnt, 2048, 2048);
+	comp.shadowMapHandle = createSpotShadowMap(lightEnt, 1024, 1024);
 
 	// Calculate light space matrix AFTER shadow map is created
 	recalcSpotlightMatrix(lightEnt);
@@ -435,8 +435,10 @@ mat4 LightManager::getSpotLightSpaceMatrix(const vec3& position, const vec3& dir
 	const vec3 normalizedDir = normalize(direction);
 	vec3 up = vec3(0.0f, 1.0f, 0.0f);
 	if(abs(dot(normalizedDir, up)) > 0.99f)
-		up = vec3(1.0f, 0.0f, 0.0f); // Use X-axis as up when light points straight up/down
+		up = vec3(1.0f, 0.0f, 0.0f);
 
+	// LookAt from position + small offset to avoid self-shadowing issues
+	// Ensure the camera is looking in the right direction
 	const mat4 view = lookAt(position, position + normalizedDir, up);
 
 	return projection * view;
@@ -552,6 +554,7 @@ void LightManager::renderDirLightShadows(const DrawModelsCallback& drawModels)
 	if(lightRegistry.storage<DirShadowMapComponent>().empty())
 		return;
 
+	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 	glEnable(GL_POLYGON_OFFSET_FILL);
 	glPolygonOffset(2.0f, 4.0f);
@@ -570,6 +573,7 @@ void LightManager::renderDirLightShadows(const DrawModelsCallback& drawModels)
 	}
 
 	glDisable(GL_POLYGON_OFFSET_FILL);
+	glDisable(GL_CULL_FACE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -605,6 +609,7 @@ void LightManager::renderPointLightShadows(const DrawModelsCallback& drawModels)
 	}
 
 	glDisable(GL_POLYGON_OFFSET_FILL);
+	glDisable(GL_CULL_FACE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -613,7 +618,10 @@ void LightManager::renderSpotlightShadows(const DrawModelsCallback& drawModels)
 	if(lightRegistry.storage<SpotShadowMapComponent>().empty())
 		return;
 
+	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(1.1f, 4.0f);
 
 	cachedShadowMapShader.use();
 
@@ -628,5 +636,7 @@ void LightManager::renderSpotlightShadows(const DrawModelsCallback& drawModels)
 		drawModels(cachedShadowMapShader);
 	}
 
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glDisable(GL_CULL_FACE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

@@ -91,7 +91,6 @@ static void setupScene(Renderer& renderer, Data& inGameData)
 	pLight.specular.r = 0.0f;
 	lightManager.updatePointLight(aux);
 
-	/*
 	constexpr vec3 spotPositions[] = {
 		vec3(-2.0f, 5.0f, -2.0f),
 		vec3(-2.0f, 5.0f, 2.0f),
@@ -111,7 +110,6 @@ static void setupScene(Renderer& renderer, Data& inGameData)
 		);
 		inGameData.spotlights.push_back(aux);
 	}
-	*/
 
 	TransformComponent boxTransform{
 		.position = vec3(18.0f, -1.0f, 18.0f),

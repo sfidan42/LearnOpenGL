@@ -211,9 +211,9 @@ void Mesh::bind(const Shader& shader) const
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<GLuint>(SSBOBindingPoint::NormalTextures), normalHandlesSSBO);
 
 	// Set counts
-	shader.setInt("u_numDiffuseTextures", static_cast<int>(diffuseHandles.size()));
-	shader.setInt("u_numSpecularTextures", static_cast<int>(specularHandles.size()));
-	shader.setInt("u_numNormalTextures", static_cast<int>(normalHandles.size()));
+	shader.setInt("u_numDiffuse", static_cast<int>(diffuseHandles.size()));
+	shader.setInt("u_numSpecular", static_cast<int>(specularHandles.size()));
+	shader.setInt("u_numNormal", static_cast<int>(normalHandles.size()));
 }
 
 bool ProcessTexture(unsigned char* data, int width, int height, int nrComponents, GLuint& textureID)
