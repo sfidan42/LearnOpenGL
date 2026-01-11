@@ -49,7 +49,6 @@ in mat3 TBN;
 out vec4 FragColor;
 
 
-
 // ================= BINDLESS TEXTURE HANDLES =================
 // Texture handles stored in SSBOs for unlimited textures
 layout(std430, binding = 0) buffer DiffuseTextureHandles {
@@ -86,7 +85,7 @@ struct DirLightComponent
     float pad3;
 
     mat4 lightSpaceMatrix;
-    sampler2DShadow shadowMap; // Bindless 2D shadow map handle
+    sampler2DShadow shadowMap;// Bindless 2D shadow map handle
     float pad4[2];
 };
 
@@ -101,8 +100,8 @@ struct PointLight
     float quadratic;
     vec3 specular;
     float farPlane;
-    mat4 shadowMatrices[6]; // Cached projection * view matrices for 6 faces
-    samplerCube shadowMap; // Bindless cubemap handle
+    mat4 shadowMatrices[6];// Cached projection * view matrices for 6 faces
+    samplerCube shadowMap;// Bindless cubemap handle
     float _pad[3];
 };
 
@@ -119,7 +118,7 @@ struct SpotLight
     vec3 specular;
     float quadratic;
     mat4 lightSpaceMatrix;
-    sampler2DShadow shadowMap; // Bindless 2D shadow map handle
+    sampler2DShadow shadowMap;// Bindless 2D shadow map handle
     float _pad[2];
 };
 
@@ -146,8 +145,9 @@ uniform vec3 viewPos;
 vec3 GetNormal();
 vec3 GetDiffuseColor();
 vec3 GetSpecularColor();
+
 float DirShadowCalculation(DirLightComponent light, vec3 fragPos, vec3 normal, vec3 lightDir);
-float PointShadowCalculation(PointLight light, vec3 fragPos);
+float PointShadowCalculation(PointLight light, vec3 fragPos, vec3 normal);
 float SpotShadowCalculation(SpotLight light, vec3 fragPos, vec3 normal, vec3 lightDir);
 
 vec3 CalcDirLight(DirLightComponent light, vec3 normal, vec3 fragPos, vec3 viewDir);
@@ -164,13 +164,13 @@ void main()
 
     // Calculate all directional lights
     for (int i = 0; i < u_numDirLights; i++)
-        result += CalcDirLight(dirLights[i], norm, FragPos, viewDir);
+    result += CalcDirLight(dirLights[i], norm, FragPos, viewDir);
 
     for (int i = 0; i < u_numPointLights; i++)
-        result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
+    result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
 
     for (int i = 0; i < u_numSpotLights; i++)
-        result += CalcSpotLight(spotLights[i], norm, FragPos, viewDir);
+    result += CalcSpotLight(spotLights[i], norm, FragPos, viewDir);
 
     // Gamma correction
     result = pow(result, vec3(1.0 / 2.2));
@@ -180,20 +180,20 @@ void main()
 
 // ================= MATERIAL HELPERS =================
 
-const vec3 MISSING_TEXTURE_COLOR = vec3(1.0, 0.0, 1.0); // Magenta for missing textures (like Blender)
+const vec3 MISSING_TEXTURE_COLOR = vec3(1.0, 0.0, 1.0);// Magenta for missing textures (like Blender)
 
 vec3 GetNormal()
 {
     if (u_numNormalTextures <= 0)
-        return normalize(TBN[2]); // world-space normal from vertex shader
+    return normalize(TBN[2]);// world-space normal from vertex shader
 
     // Sample and average all normal maps (typically there's only one)
     vec3 normalMap = vec3(0.0);
     for (int i = 0; i < u_numNormalTextures; i++)
-        normalMap += texture(normalTextures[i], TexCoord).rgb;
+    normalMap += texture(normalTextures[i], TexCoord).rgb;
 
     normalMap /= float(u_numNormalTextures);
-    normalMap = normalMap * 2.0 - 1.0; // [0,1] → [-1,1]
+    normalMap = normalMap * 2.0 - 1.0;// [0,1] → [-1,1]
 
     return normalize(TBN * normalMap);
 }
@@ -201,11 +201,11 @@ vec3 GetNormal()
 vec3 GetDiffuseColor()
 {
     if (u_numDiffuseTextures <= 0)
-        return MISSING_TEXTURE_COLOR; // Show magenta for missing diffuse texture
+    return MISSING_TEXTURE_COLOR;// Show magenta for missing diffuse texture
 
     vec3 color = vec3(0.0);
     for (int i = 0; i < u_numDiffuseTextures; i++)
-        color += texture(diffuseTextures[i], TexCoord).rgb;
+    color += texture(diffuseTextures[i], TexCoord).rgb;
 
     return color / float(u_numDiffuseTextures);
 }
@@ -213,11 +213,11 @@ vec3 GetDiffuseColor()
 vec3 GetSpecularColor()
 {
     if (u_numSpecularTextures <= 0)
-        return vec3(0.5); // Gray fallback for missing specular (common default)
+    return vec3(0.5);// Gray fallback for missing specular (common default)
 
     vec3 color = vec3(0.0);
     for (int i = 0; i < u_numSpecularTextures; i++)
-        color += texture(specularTextures[i], TexCoord).rgb;
+    color += texture(specularTextures[i], TexCoord).rgb;
 
     return color / float(u_numSpecularTextures);
 }
@@ -226,22 +226,22 @@ vec3 GetSpecularColor()
 
 // Poisson disk for soft shadow sampling
 const vec2 poissonDisk[16] = vec2[](
-    vec2(-0.94201624, -0.39906216),
-    vec2(0.94558609, -0.76890725),
-    vec2(-0.094184101, -0.92938870),
-    vec2(0.34495938, 0.29387760),
-    vec2(-0.91588581, 0.45771432),
-    vec2(-0.81544232, -0.87912464),
-    vec2(-0.38277543, 0.27676845),
-    vec2(0.97484398, 0.75648379),
-    vec2(0.44323325, -0.97511554),
-    vec2(0.53742981, -0.47373420),
-    vec2(-0.26496911, -0.41893023),
-    vec2(0.79197514, 0.19090188),
-    vec2(-0.24188840, 0.99706507),
-    vec2(-0.81409955, 0.91437590),
-    vec2(0.19984126, 0.78641367),
-    vec2(0.14383161, -0.14100790)
+vec2(-0.94201624, -0.39906216),
+vec2(0.94558609, -0.76890725),
+vec2(-0.094184101, -0.92938870),
+vec2(0.34495938, 0.29387760),
+vec2(-0.91588581, 0.45771432),
+vec2(-0.81544232, -0.87912464),
+vec2(-0.38277543, 0.27676845),
+vec2(0.97484398, 0.75648379),
+vec2(0.44323325, -0.97511554),
+vec2(0.53742981, -0.47373420),
+vec2(-0.26496911, -0.41893023),
+vec2(0.79197514, 0.19090188),
+vec2(-0.24188840, 0.99706507),
+vec2(-0.81409955, 0.91437590),
+vec2(0.19984126, 0.78641367),
+vec2(0.14383161, -0.14100790)
 );
 
 float DirShadowCalculation(DirLightComponent light, vec3 fragPos, vec3 normal, vec3 lightDir)
@@ -257,8 +257,8 @@ float DirShadowCalculation(DirLightComponent light, vec3 fragPos, vec3 normal, v
 
     // Check if fragment is outside the shadow map (no shadow outside coverage)
     if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 ||
-        projCoords.y < 0.0 || projCoords.y > 1.0)
-        return 0.0;
+    projCoords.y < 0.0 || projCoords.y > 1.0)
+    return 0.0;
 
     // Calculate bias based on surface angle
     float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
@@ -282,32 +282,45 @@ float DirShadowCalculation(DirLightComponent light, vec3 fragPos, vec3 normal, v
     return 1.0 - shadow;
 }
 
-// Point light shadow calculation using cubemap
-float PointShadowCalculation(PointLight light, vec3 fragPos)
+float PointShadowCalculation(PointLight light, vec3 fragPos, vec3 normal)
 {
-    // If no shadow map, return no shadow
-    if (light.farPlane <= 0.0)
-        return 0.0;
-
-    // Direction from light to fragment
     vec3 fragToLight = fragPos - light.position;
-
-    // Sample the cubemap - get the depth stored at this direction
-    float closestDepth = texture(light.shadowMap, fragToLight).r;
-
-    // closestDepth is in [0,1] range, convert back to actual depth
-    closestDepth *= light.farPlane;
-
-    // Current distance from light to fragment
     float currentDepth = length(fragToLight);
+    vec3 lightDir = normalize(light.position - fragPos);
 
-    // Bias to prevent shadow acne
-    float bias = 0.15;
+    // --- 1. STABLE SLOPE BIAS ---
+    // Higher bias for surfaces tilted away from the light
+    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
 
-    // Compare
-    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    // --- 2. NORMAL OFFSET (Crucial for Thin Geometry) ---
+    // Physically nudge the sampling point 'out' from the surface.
+    // This allows the shadow to touch the edge without Peter Panning.
+    float normalOffset = 0.15;
+    vec3 shadowSamplePos = fragToLight + (normal * normalOffset);
 
-    return shadow;
+    // --- 3. DYNAMIC PCF LOOP ---
+    float shadow = 0.0;
+    float samples = 2.0; // Results in (samples*2)^3 total samples (e.g., 2 -> 64 samples)
+    float offset = 0.01; // Softness radius
+
+    // Replace the baked array with a 3D grid loop
+    for(float x = -offset; x <= offset; x += offset / samples)
+    {
+        for(float y = -offset; y <= offset; y += offset / samples)
+        {
+            for(float z = -offset; z <= offset; z += offset / samples)
+            {
+                float closestDepth = texture(light.shadowMap, shadowSamplePos + vec3(x, y, z)).r;
+                closestDepth *= light.farPlane;
+                if(currentDepth - bias > closestDepth)
+                shadow += 1.0;
+            }
+        }
+    }
+
+    // Normalize by the actual number of iterations
+    float totalSamples = pow(samples * 2.0 + 1.0, 3.0);
+    return shadow / totalSamples;
 }
 
 // Spot light shadow calculation using 2D shadow map
@@ -324,8 +337,8 @@ float SpotShadowCalculation(SpotLight light, vec3 fragPos, vec3 normal, vec3 lig
 
     // Check if fragment is outside the shadow map
     if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 ||
-        projCoords.y < 0.0 || projCoords.y > 1.0)
-        return 0.0;
+    projCoords.y < 0.0 || projCoords.y > 1.0)
+    return 0.0;
 
     // Calculate bias based on surface angle
     // Reduced bias since we use polygon offset in shadow rendering
@@ -385,7 +398,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     vec3 specular = light.specular * spec * specularColor;
 
     // Calculate shadow for this point light
-    float shadow = PointShadowCalculation(light, fragPos);
+    float shadow = PointShadowCalculation(light, fragPos, normal);
     float visibility = 1.0 - shadow;
 
     return (ambient + visibility * (diffuse + specular)) * attenuation;
@@ -402,9 +415,9 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
 
     float distance = length(light.position - fragPos);
     float attenuation =
-        1.0 / (light.constant +
-        light.linear * distance +
-        light.quadratic * distance * distance);
+    1.0 / (light.constant +
+    light.linear * distance +
+    light.quadratic * distance * distance);
 
     float theta = dot(lightDir, normalize(-light.direction));
     float epsilon = light.cutOff - light.outerCutOff;

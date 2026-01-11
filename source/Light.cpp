@@ -39,7 +39,7 @@ entt::entity LightManager::createPointLight(const vec3& position, const vec3& co
 	auto& comp = lightRegistry.emplace<PointLightComponent>(lightEnt, lightComp);
 
 	// Create shadow map for this light using ShadowManager
-	comp.cubeMapHandle = createPointShadowMap(lightEnt, 512);
+	comp.cubeMapHandle = createPointShadowMap(lightEnt, 1024);
 
 	// Calculate shadow matrices AFTER shadow map is created
 	recalcPointLightMatrices(lightEnt);
@@ -578,7 +578,10 @@ void LightManager::renderPointLightShadows(const DrawModelsCallback& drawModels)
 	if(lightRegistry.storage<PointShadowMapComponent>().empty())
 		return;
 
-	glCullFace(GL_BACK);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_FRONT);
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(1.0f, 1.0f);
 
 	cachedShadowPointShader.use();
 	cachedShadowPointShader.setFloat("farPlane", POINT_LIGHT_FAR_PLANE);
@@ -601,6 +604,7 @@ void LightManager::renderPointLightShadows(const DrawModelsCallback& drawModels)
 		drawModels(cachedShadowPointShader);
 	}
 
+	glDisable(GL_POLYGON_OFFSET_FILL);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
